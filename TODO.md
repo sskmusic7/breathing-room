@@ -1,5 +1,17 @@
 # Next steps
 
+## Already done
+
+- ~~Build `DebtPots.sol` payday-sweep contract (9/9 tests)~~
+- ~~Build the deterministic SFS calculator (5/5 tests)~~
+- ~~Build the local legal RAG - 11 UK statute summaries (Chroma, offline)~~
+- ~~Clone the official Monad/Privy frontend starter, `npm install`~~
+- ~~Push everything to `github.com/sskmusic7/breathing-room`~~
+- ~~Fill in the hackathon dashboard project description + repo link~~
+- ~~Connect Chainlink Automation - `DebtPotsAutomation.sol` (9/9 tests)~~
+- ~~Connect Alchemy - RPC alias + Notify webhook receiver (8/8 tests)~~
+- ~~Add Pauline (`112358132135`) as a repo collaborator, write access~~
+
 ## You (Kayah) — quick, ~10 min
 
 - [ ] Faucet: paste `0x8960b2bbb4d1c1d9c20B23835680465Ad98F95AF` at
