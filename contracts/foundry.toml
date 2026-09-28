@@ -1,0 +1,17 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+remappings = [
+    "openzeppelin-contracts/=lib/openzeppelin-contracts/",
+    "forge-std/=lib/forge-std/src/",
+]
+
+[rpc_endpoints]
+monad_testnet = "https://testnet-rpc.monad.xyz"
+
+[etherscan]
+monad_testnet = { key = "${MONADSCAN_API_KEY}", url = "https://testnet.monadscan.com/api", chain = 10143 }
+
+# Monad Testnet: chain id 10143, currency MON, faucet https://faucet.monad.xyz
+# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

@@ -1,0 +1,27 @@
+# Foundry
+contracts/out/
+contracts/cache/
+contracts/broadcast/*/31337/
+!contracts/broadcast/**/run-latest.json
+
+# Backend (Python)
+backend/.venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/.pytest_cache/
+backend/data/chroma/
+*.pyc
+
+# Frontend (Next.js)
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# Env files - never commit real secrets
+.env
+.env.local
+!.env.example
+!frontend/.env.example
+
+# OS
+.DS_Store
