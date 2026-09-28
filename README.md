@@ -15,8 +15,11 @@ GMT+1**.
 
 - **Primary track**: Consumer Products & Payments ($30,000)
 - **Sponsor bounties targeted**: Privy! ($5,000 - embedded wallet doing more
-  than login, signing the payday sweep) and Best Builds Powered by KIMI
-  ($3,000 in credits - powers the legal-appeal drafting pipeline)
+  than login, signing the payday sweep), Best Builds Powered by KIMI
+  ($3,000 in credits - powers the legal-appeal drafting pipeline), Best
+  workflow with CRE ($3,000 - Chainlink Automation triggers the payday
+  sweep on-chain), and Best Projects using Alchemy ($1,000 in credits -
+  RPC + Notify webhooks for push notifications)
 
 ## Repo layout
 
@@ -44,6 +47,43 @@ breathing-room/
 
   ```bash
   cd contracts && forge test -vv
+  ```
+
+- **`contracts/src/DebtPotsAutomation.sol`** - the actual "autopilot": a
+  Chainlink Automation-compatible wrapper (`checkUpkeep`/`performUpkeep`)
+  that calls `DebtPots.sweep()` the moment a payday deposit lands, on-chain,
+  with no backend or cron job needing to be trusted or even online.
+  `DebtPots.sol` itself is untouched (`sweep()` was already open to any
+  caller, so Automation just becomes another valid caller). **9/9 tests
+  passing**, including re-validating on-chain state rather than trusting
+  the registry's `performData` (per Chainlink's own guidance) and proving
+  any address can call `performUpkeep` (matches how the Automation registry
+  actually calls it, from an unpredictable forwarder address).
+
+  ```bash
+  cd contracts && forge test --match-path test/DebtPotsAutomation.t.sol -vv
+  ```
+
+  To actually register it: deploy `DebtPots.sol`, then
+  `script/DeployDebtPotsAutomation.s.sol` with `DEBT_POTS_ADDRESS` set, then
+  register the deployed `DebtPotsAutomation` address as a Custom Logic
+  upkeep at [automation.chain.link](https://automation.chain.link) (Monad
+  testnet), funded with testnet LINK.
+
+- **`backend/app/webhooks/alchemy.py`** - Alchemy Notify webhook receiver.
+  Verifies the `X-Alchemy-Signature` HMAC-SHA256 header exactly per
+  Alchemy's docs, parses an Address Activity payload, and turns an incoming
+  transfer into a `PaydayDepositEvent` - purely a notification path ("tell
+  the user something happened"), deliberately kept independent from the
+  Chainlink Automation trigger above ("make the payment happen"), so
+  neither depends on the other being online. **8/8 tests passing**,
+  including signature-tampering rejection and the missing-config 503 path.
+  Actual push delivery isn't wired up yet - see the docstring on
+  `notify_payday_deposit()` for exactly why (it needs the frontend's
+  push-subscription storage, which the Privy PWA starter leaves as a TODO).
+
+  ```bash
+  cd backend && source .venv/bin/activate && python -m pytest tests/test_alchemy_webhook.py -v
   ```
 
 - **`backend/app/sfs_engine/`** - the deterministic Standard Financial
@@ -112,6 +152,9 @@ breathing-room/
 7. **SFS Membership number** (MaPS) + **ICO registration** - see
    `docs/regulatory_guardrails.md` and `docs/data_protection.md` for exactly
    why and how.
+8. **Register the Chainlink Automation upkeep** and **create the Alchemy
+   app + Notify webhook** (both need real dashboard accounts - see "Useful
+   hackathon links" below) once `DebtPots.sol` is deployed to testnet.
 
 ## Useful hackathon links
 
@@ -121,6 +164,8 @@ breathing-room/
   explorer https://testnet.monadscan.com
 - Privy dashboard: https://dashboard.privy.io
 - KIMI/Moonshot API: https://platform.moonshot.ai
+- Chainlink Automation: https://automation.chain.link
+- Alchemy dashboard (create a "Monad Testnet" app): https://dashboard.alchemy.com
 
 ---
 Breathing Room provides legal information and software tools, not legal

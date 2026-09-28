@@ -9,6 +9,10 @@ remappings = [
 
 [rpc_endpoints]
 monad_testnet = "https://testnet-rpc.monad.xyz"
+# Alchemy: higher rate limits + archive data + the Notify webhooks used by
+# backend/app/webhooks/alchemy.py. Get a key at https://dashboard.alchemy.com
+# (create an app on "Monad Testnet") and set ALCHEMY_API_KEY before using this.
+alchemy_monad_testnet = "https://monad-testnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
 
 [etherscan]
 monad_testnet = { key = "${MONADSCAN_API_KEY}", url = "https://testnet.monadscan.com/api", chain = 10143 }

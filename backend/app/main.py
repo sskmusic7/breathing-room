@@ -14,13 +14,16 @@ transaction building) versus what's fully implemented and tested today
 """
 from __future__ import annotations
 
-from fastapi import FastAPI
+import os
+
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.rag.draft import MitigatingCircumstances, NoticeFacts, draft_representation_letter
 from app.rag.query import query_legal_corpus
 from app.sfs_engine.calculator import calculate_sfs
 from app.sfs_engine.models import SfsRequest, SfsResult
+from app.webhooks.alchemy import notify_payday_deposit, parse_address_activity, verify_signature
 
 app = FastAPI(title="Breathing Room API", version="0.1.0")
 
@@ -56,3 +59,28 @@ def rag_search(q: str, issuer_type: str | None = None, n: int = 4) -> list[dict]
         {"id": r.id, "metadata": r.metadata, "distance": r.distance, "excerpt": r.text[:300]}
         for r in results
     ]
+
+
+@app.post("/webhooks/alchemy")
+async def alchemy_webhook(request: Request) -> dict:
+    """Alchemy Notify Address Activity webhook. See app/webhooks/alchemy.py
+    for why this only ever triggers a notification, never money movement -
+    that's Chainlink Automation's job (contracts/src/DebtPotsAutomation.sol),
+    kept independent on purpose.
+    """
+    signing_key = os.environ.get("ALCHEMY_WEBHOOK_SIGNING_KEY")
+    if not signing_key:
+        raise HTTPException(status_code=503, detail="ALCHEMY_WEBHOOK_SIGNING_KEY not configured")
+
+    raw_body = await request.body()
+    signature = request.headers.get("x-alchemy-signature", "")
+
+    if not verify_signature(raw_body, signature, signing_key):
+        raise HTTPException(status_code=401, detail="invalid signature")
+
+    payload = await request.json()
+    events = parse_address_activity(payload)
+    for event in events:
+        notify_payday_deposit(event)
+
+    return {"received": len(events)}
