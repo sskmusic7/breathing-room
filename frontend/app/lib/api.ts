@@ -117,3 +117,43 @@ export async function draftAppeal(facts: NoticeFacts): Promise<DraftAppealResult
 }
 
 export const SFS_RESULT_STORAGE_KEY = "br_last_sfs_result";
+
+// ---- Open Banking (TrueLayer sandbox, via the backend's /bank/* routes) ----
+
+export interface BankStatus {
+  configured: boolean;
+  bank_connected: boolean;
+  mandate_status: string | null;
+  plan: { pot_address: string; surplus_gbp: number } | null;
+  collecting: boolean;
+  events: { at: string; text: string }[];
+}
+
+export const bankConnectUrl = (wallet: string) =>
+  `${API_URL}/bank/connect?wallet=${encodeURIComponent(wallet)}`;
+
+async function bankFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_URL}/bank${path}`, {
+    ...init,
+    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+  });
+  if (!res.ok) throw new Error(`${path} failed: ${res.status} ${await res.text()}`);
+  return res.json();
+}
+
+export const getBankStatus = (wallet: string) =>
+  bankFetch<BankStatus>(`/status?wallet=${encodeURIComponent(wallet)}`);
+
+export const getBankSummary = (wallet: string) =>
+  bankFetch<{ employment: number; fixed_costs: number; flexible_costs: number }>(
+    `/summary?wallet=${encodeURIComponent(wallet)}`
+  );
+
+export const startBankMandate = (body: { wallet: string; name: string; email: string; max_monthly_gbp: number }) =>
+  bankFetch<{ url: string }>("/mandate", { method: "POST", body: JSON.stringify(body) });
+
+export const saveBankPlan = (body: { wallet: string; pot_address: string; surplus_gbp: number }) =>
+  bankFetch<{ ok: boolean }>("/plan", { method: "POST", body: JSON.stringify(body) });
+
+export const checkPaydayNow = (wallet: string) =>
+  bankFetch<BankStatus>(`/check-now?wallet=${encodeURIComponent(wallet)}`, { method: "POST" });

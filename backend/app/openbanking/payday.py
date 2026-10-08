@@ -1,0 +1,99 @@
+"""Payday detection and automatic surplus collection.
+
+One cycle per linked user (run every couple of minutes, or on demand):
+  1. A collection already in flight? Check its TrueLayer status; once
+     executed, on-ramp the money into the user's pot. Chainlink CRE then
+     sees the deposit and pays creditors.
+  2. Otherwise read recent transactions; on a new payday credit, collect
+     the user's planned surplus over their VRP mandate.
+Only the surplus is ever collected: essentials stay in the user's bank.
+"""
+from __future__ import annotations
+
+import re
+
+from . import onramp, store, truelayer
+
+SALARY_PATTERN = re.compile(r"salary|payroll|wages|pay\b|bacs", re.IGNORECASE)
+MIN_PAYDAY_GBP = 300.0
+EXECUTED = {"executed", "settled"}
+FAILED = {"failed"}
+
+
+def summarise_budget(transactions: list[dict]) -> dict:
+    """Monthly income / fixed / flexible outgoings from real transactions, for the SFS form."""
+    fixed_categories = {"DIRECT_DEBIT", "STANDING_ORDER", "BILL_PAYMENT"}
+    income = fixed = flexible = 0.0
+    for t in transactions:
+        amount = float(t.get("amount", 0))
+        if amount > 0:
+            income += amount
+        elif t.get("transaction_category") in fixed_categories:
+            fixed += -amount
+        else:
+            flexible += -amount
+    return {"employment": round(income, 2), "fixed_costs": round(fixed, 2), "flexible_costs": round(flexible, 2)}
+
+
+def find_payday(transactions: list[dict], processed: set[str]) -> dict | None:
+    """Newest unprocessed salary-looking credit; falls back to the largest
+    unprocessed credit over MIN_PAYDAY_GBP (sandbox data rarely says "SALARY")."""
+    credits = [
+        t for t in transactions
+        if float(t.get("amount", 0)) >= MIN_PAYDAY_GBP and t.get("transaction_id") not in processed
+    ]
+    if not credits:
+        return None
+    salary = [t for t in credits if SALARY_PATTERN.search(t.get("description", ""))]
+    if salary:
+        return max(salary, key=lambda t: t.get("timestamp", ""))
+    return max(credits, key=lambda t: float(t["amount"]))
+
+
+def run_cycle(wallet: str) -> None:
+    record = store.get(wallet)
+    if not record.get("tokens") or record.get("mandate_status") != "authorized":
+        return
+    plan = record.get("plan") or {}
+    if not plan.get("pot_address") or not plan.get("surplus_gbp"):
+        return
+
+    pending = record.get("pending_payment")
+    if pending:
+        status = truelayer.get_payment(pending["id"]).get("status", "")
+        if status in EXECUTED:
+            tx = onramp.send_to_pot(plan["pot_address"], pending["amount_gbp"])
+            store.update(wallet, pending_payment=None, last_onramp_tx=tx)
+            store.add_event(wallet, f"£{pending['amount_gbp']:.2f} collected from your bank and moved into your pot. Chainlink will pay your creditors within a couple of minutes.")
+        elif status in FAILED:
+            store.update(wallet, pending_payment=None)
+            store.add_event(wallet, f"Bank collection of £{pending['amount_gbp']:.2f} failed. Nothing was taken.")
+        return
+
+    tokens = truelayer.refresh_data_tokens(record["tokens"])
+    if tokens is not record["tokens"]:
+        store.update(wallet, tokens=tokens)
+    processed = set(record.get("processed_paydays", []))
+    payday = find_payday(truelayer.get_transactions(tokens["access_token"]), processed)
+    if not payday:
+        return
+
+    amount = min(float(plan["surplus_gbp"]), float(payday["amount"]))
+    payment = truelayer.create_mandate_payment(record["mandate_id"], amount, record["tl_user_id"], "BR PAYDAY")
+    store.update(
+        wallet,
+        processed_paydays=[*processed, payday["transaction_id"]],
+        pending_payment={"id": payment["id"], "amount_gbp": amount, "payday_id": payday["transaction_id"]},
+    )
+    store.add_event(
+        wallet,
+        f"Payday spotted: £{float(payday['amount']):.2f} ({payday.get('description', 'credit')}). Collecting your £{amount:.2f} surplus. Essentials stay in your bank.",
+    )
+
+
+def run_all() -> None:
+    for wallet in store.all_wallets():
+        try:
+            run_cycle(wallet)
+        except Exception as exc:  # one user's failure mustn't stop the others
+            store.add_event(wallet, f"Payday check hit a problem: {exc}"[:300])

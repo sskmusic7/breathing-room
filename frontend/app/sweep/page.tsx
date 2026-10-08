@@ -7,6 +7,7 @@ import { createPublicClient, http, formatEther, parseEther, encodeFunctionData, 
 import { monadTestnet } from "viem/chains";
 import { DEBT_POTS_ABI, DEBT_POTS_ADDRESS, DEMO_CREDITOR_ADDRESS, GBP_TO_MON_RATE } from "../lib/contracts";
 import { DEBT_POTS_BYTECODE } from "../lib/debtPotsBytecode";
+import BankAutopay from "../components/BankAutopay";
 import { SFS_RESULT_STORAGE_KEY, type SfsResult } from "../lib/api";
 
 const publicClient = createPublicClient({ chain: monadTestnet, transport: http() });
@@ -50,6 +51,7 @@ export default function SweepPage() {
   const [savingsBufferGbp, setSavingsBufferGbp] = useState("10");
   const [depositGbp, setDepositGbp] = useState("1500");
   const [creditors, setCreditors] = useState<SweepCreditorRow[]>([]);
+  const [surplusGbp, setSurplusGbp] = useState<number | null>(null);
 
   const [potAddress, setPotAddress] = useState<`0x${string}` | null>(null);
   const [setupError, setSetupError] = useState<string | null>(null);
@@ -136,11 +138,28 @@ export default function SweepPage() {
     };
   }, [walletAddress, potAddress, sendTransaction, fetchBalance]);
 
+  // With bank collection only the surplus enters the pot (essentials never
+  // leave the bank), so the pot itself must not hold anything back.
+  useEffect(() => {
+    if (!potAddress) return;
+    (async () => {
+      const [living, buffer] = await Promise.all(
+        (["livingExpensesAllowanceWei", "savingsBufferWei"] as const).map(
+          (fn) => publicClient.readContract({ address: potAddress, abi: DEBT_POTS_ABI, functionName: fn }) as Promise<bigint>
+        )
+      );
+      if (living + buffer === BigInt(0)) return;
+      const data = encodeFunctionData({ abi: DEBT_POTS_ABI, functionName: "setAllowance", args: [BigInt(0), BigInt(0)] });
+      await sendTransaction({ to: potAddress, data, value: 0 }).catch(() => {});
+    })();
+  }, [potAddress, sendTransaction]);
+
   // Prefill the creditor table from whatever the SFS screen last calculated.
   useEffect(() => {
     const raw = sessionStorage.getItem(SFS_RESULT_STORAGE_KEY);
     if (!raw) return;
     const sfs: SfsResult = JSON.parse(raw);
+    setSurplusGbp(Number(sfs.surplus_for_creditors) || null);
     setCreditors(
       sfs.allocations.map((a) => ({
         id: a.creditor_id,
@@ -259,6 +278,48 @@ export default function SweepPage() {
               </button>
             </section>
 
+            <BankAutopay
+              wallet={walletAddress}
+              potAddress={potAddress}
+              surplusGbp={surplusGbp}
+              defaultEmail={user.email?.address}
+            />
+
+            <ActionCard
+              step={1}
+              title="Confirm your creditors"
+              description="Pulled in from your budget. Each creditor gets their fair share of whatever's left after your essentials."
+              tx={creditorsTx}
+            >
+              {creditors.length === 0 ? (
+                <p className="text-sm text-slate-400">
+                  No creditors yet —{" "}
+                  <Link href="/sfs" className="text-blue-600 hover:underline">
+                    calculate your SFS
+                  </Link>{" "}
+                  first.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {creditors.map((c) => (
+                    <div key={c.id} className="flex justify-between text-sm">
+                      <span className="truncate">{c.label}</span>
+                      <span>£{c.debtBalanceGbp} owed</span>
+                    </div>
+                  ))}
+                  <button
+                    onClick={onSetCreditors}
+                    disabled={creditorsTx.status === "pending"}
+                    className="mt-2 rounded bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 px-4 py-2 font-semibold disabled:opacity-50"
+                  >
+                    {creditorsTx.status === "pending" ? "Saving…" : "Confirm creditors"}
+                  </button>
+                </div>
+              )}
+            </ActionCard>
+
+            <details className="mb-4">
+              <summary className="text-xs text-slate-400 cursor-pointer mb-2">Demo controls (manual payday)</summary>
             <ActionCard
               step={1}
               title="Payday lands"
@@ -320,38 +381,6 @@ export default function SweepPage() {
               </button>
             </ActionCard>
 
-            <ActionCard
-              step={3}
-              title="Confirm your creditors"
-              description="Pulled in from your budget. Each creditor gets their fair share of whatever's left after your essentials."
-              tx={creditorsTx}
-            >
-              {creditors.length === 0 ? (
-                <p className="text-sm text-slate-400">
-                  No creditors yet —{" "}
-                  <Link href="/sfs" className="text-blue-600 hover:underline">
-                    calculate your SFS
-                  </Link>{" "}
-                  first.
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {creditors.map((c) => (
-                    <div key={c.id} className="flex justify-between text-sm">
-                      <span className="truncate">{c.label}</span>
-                      <span>£{c.debtBalanceGbp} owed</span>
-                    </div>
-                  ))}
-                  <button
-                    onClick={onSetCreditors}
-                    disabled={creditorsTx.status === "pending"}
-                    className="mt-2 rounded bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 px-4 py-2 font-semibold disabled:opacity-50"
-                  >
-                    {creditorsTx.status === "pending" ? "Saving…" : "Confirm creditors"}
-                  </button>
-                </div>
-              )}
-            </ActionCard>
 
             <ActionCard
               step={4}
@@ -367,6 +396,7 @@ export default function SweepPage() {
                 {sweepTx.status === "pending" ? "Paying…" : "Pay now"}
               </button>
             </ActionCard>
+            </details>
             <p className="text-[11px] text-slate-400 text-center mt-6">
               Payments settle on Monad. Automation by Chainlink. Accounts by Privy.
             </p>

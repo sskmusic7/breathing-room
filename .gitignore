@@ -36,3 +36,4 @@ automation-cre/**/cache/
 contracts/*-time-to-pick-back-up-*.txt
 automation-cre/**/.cre_build_tmp.js
 /2026-*-*.txt
+backend/secrets/

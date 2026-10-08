@@ -6,26 +6,47 @@ Endpoints:
   POST /draft-appeal    - RAG-grounded representation letter draft
   GET  /rag/search      - raw legal corpus search (debugging/demo)
 
-No Open Banking or OCR integration is wired up yet in this MVP - see
-README.md "What's stubbed" for the honest list of what still needs real
-integration work (TrueLayer/Yapily sandbox, a vision OCR call, Privy
-transaction building) versus what's fully implemented and tested today
-(the SFS engine and the RAG retrieval + drafting pipeline).
+  /bank/*               - TrueLayer Open Banking: link bank, VRP mandate,
+                          automatic payday surplus collection (app/openbanking/)
+
+Payday checks run in a background loop every PAYDAY_CHECK_SECONDS (120).
 """
 from __future__ import annotations
 
+import asyncio
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.openbanking import payday as bank_payday
+from app.openbanking.routes import router as bank_router
 from app.rag.draft import MitigatingCircumstances, NoticeFacts, draft_representation_letter
 from app.rag.query import query_legal_corpus
 from app.sfs_engine.calculator import calculate_sfs
 from app.sfs_engine.models import SfsRequest, SfsResult
 from app.webhooks.alchemy import notify_payday_deposit, parse_address_activity, verify_signature
 
-app = FastAPI(title="Breathing Room API", version="0.1.0")
+PAYDAY_CHECK_SECONDS = int(os.environ.get("PAYDAY_CHECK_SECONDS", "120"))
+
+
+async def _payday_loop() -> None:
+    while True:
+        await asyncio.sleep(PAYDAY_CHECK_SECONDS)
+        await asyncio.to_thread(bank_payday.run_all)
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    task = asyncio.create_task(_payday_loop()) if PAYDAY_CHECK_SECONDS > 0 else None
+    yield
+    if task:
+        task.cancel()
+
+
+app = FastAPI(title="Breathing Room API", version="0.1.0", lifespan=lifespan)
+app.include_router(bank_router)
 
 app.add_middleware(
     CORSMiddleware,
