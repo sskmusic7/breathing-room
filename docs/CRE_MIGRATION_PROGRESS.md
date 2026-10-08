@@ -52,3 +52,10 @@ Old session log: ~/.claude/projects/-Users-sskmusic/1e858211-4ab0-4288-881c-08db
 - Local javy segfaults (exit 139) on this Intel Mac, so the WASM is compiled on the Moltesha droplet (/tmp/crep, `bun x cre-compile`) and passed with --wasm. Recompile there after any main.ts change
 - Monad bills the full gas LIMIT, not gas used: keep writeGasLimit at 500000 (2M cost ~0.2 MON per run)
 - WHEN DEPLOY ACCESS LANDS: setForwarderAddress back to 0xF8344CFd5c43616a4366C34E3EEE75af79a74482, setExpectedAuthor(<real workflow owner>) + setExpectedWorkflowName("debtpots-sweep"), stop the loop
+
+## Open Banking auto-collection (2026-10-08), built, awaiting TrueLayer sandbox credentials
+- Backend /bank/* (backend/app/openbanking/): connect bank (Data API, read-only) -> commercial VRP mandate capped at monthly surplus -> background check every 2 min spots payday -> collects ONLY the surplus -> on executed, simulated on-ramp sends GBP-equivalent MON into the user's pot -> Chainlink CRE pays creditors
+- Droplet .env still needs: TRUELAYER_CLIENT_ID, TRUELAYER_CLIENT_SECRET, TRUELAYER_SIGNING_KEY_ID, TRUELAYER_MERCHANT_ACCOUNT_ID. Signing key: backend/secrets/ (gitignored), mounted at /app/secrets on the droplet. State: /srv/breathing-room-backend/state/bank.json
+- Console redirect URIs: https://breathing-api.178-62-45-130.sslip.io/bank/callback (bank link) AND https://breathing-room-peach.vercel.app/sweep (mandate return)
+- NOT yet run against real TrueLayer: mandate body shape (use_case / user_interaction placement) is from docs and may need a tweak on first call
+- WARNING: this Mac corrupts large file writes (see memory). Build on Vercel/droplet only
