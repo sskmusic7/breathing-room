@@ -43,3 +43,12 @@ Old session log: ~/.claude/projects/-Users-sskmusic/1e858211-4ab0-4288-881c-08db
 - DebtPots is single-debtor (owner = Kayah's Privy wallet 0x6109...). Any other tester gets their OWN DebtPots deployed from their wallet on first /sweep visit (address kept in localStorage); the owner keeps using the main pot (the CRE-automated one)
 - Demo faucet 0x07f2252dC50cD68c1c010989F0fDb1af4365e39b (key in frontend/.env.faucet, gitignored; Vercel env DEMO_FAUCET_PRIVATE_KEY), funded 2 MON. /api/demo-top-up sends 0.3 MON to wallets under 0.25. Demo creditors are paid to the faucet so payouts recycle. ~0.19 MON gas per tester pot deploy, so ~6 testers per 2 MON before it needs refilling
 - Demo rate lowered to £1 = 0.00001 MON (was 0.001): re-set the main pot's allowance before the CRE e2e proof
+
+## Interim automation (2026-10-08): CRE simulator with --broadcast, PROVEN
+- Receiver forwarder switched to Chainlink's Monad MockKeystoneForwarder 0xB9F79d863261869B234c481D1f9A7af84AeAd192
+- Receiver identity: setExpectedAuthor(0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa) (the simulator's placeholder owner) + setExpectedWorkflowName("debtpots-sweep-test")
+- First automatic payout: tx 0x4c24331de971717dd6aff5de12c2fc15e0e171e9eb2c937a8d8f901506629f67 (0.32 MON in, 0.31 back to debtor, 0.01 to creditor, 220k gas)
+- Run: automation-cre/breathing-room-automation/run-sweep-check.sh (once) or `--loop` (every 2 min). Gas paid by CRE_ETH_PRIVATE_KEY (deployer) in that folder's gitignored .env
+- Local javy segfaults (exit 139) on this Intel Mac, so the WASM is compiled on the Moltesha droplet (/tmp/crep, `bun x cre-compile`) and passed with --wasm. Recompile there after any main.ts change
+- Monad bills the full gas LIMIT, not gas used: keep writeGasLimit at 500000 (2M cost ~0.2 MON per run)
+- WHEN DEPLOY ACCESS LANDS: setForwarderAddress back to 0xF8344CFd5c43616a4366C34E3EEE75af79a74482, setExpectedAuthor(<real workflow owner>) + setExpectedWorkflowName("debtpots-sweep"), stop the loop
