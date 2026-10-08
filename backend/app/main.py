@@ -29,7 +29,8 @@ app = FastAPI(title="Breathing Room API", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    # Comma-separated, e.g. "http://localhost:3000,https://breathing-room.vercel.app"
+    allow_origins=os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000").split(","),
     allow_methods=["*"],
     allow_headers=["*"],
 )

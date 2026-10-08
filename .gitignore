@@ -25,3 +25,13 @@ frontend/out/
 
 # OS
 .DS_Store
+.env.faucet
+
+# CRE workflow project (automation-cre/)
+automation-cre/**/node_modules/
+automation-cre/**/out/
+automation-cre/**/cache/
+
+# Saved chat transcripts
+contracts/*-time-to-pick-back-up-*.txt
+automation-cre/**/.cre_build_tmp.js
