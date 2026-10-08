@@ -1,7 +1,7 @@
 {
-  "name": "My Awesome PWA App",
-  "short_name": "PWA App",
-  "description": "Best PWA app in the world!",
+  "name": "Breathing Room",
+  "short_name": "Breathing Room",
+  "description": "Debts managed, on autopilot.",
   "display": "standalone",
   "orientation": "portrait",
 

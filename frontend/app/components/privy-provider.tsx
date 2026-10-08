@@ -13,8 +13,12 @@ export default function PrivyProvider({
       appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID!}
       clientId={process.env.NEXT_PUBLIC_PRIVY_CLIENT_ID!}
       config={{
+        // Crypto stays invisible: email login only (no "connect a wallet"),
+        // and no wallet confirmation popups on each transaction.
+        loginMethods: ["email"],
         // Create embedded wallets for users who don't have a wallet
         embeddedWallets: {
+          showWalletUIs: false,
           ethereum: {
             createOnLogin: "users-without-wallets",
           },
