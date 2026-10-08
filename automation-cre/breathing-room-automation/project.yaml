@@ -1,0 +1,18 @@
+# ==========================================================================
+# CRE PROJECT SETTINGS FILE
+# Breathing Room: DebtPotsAutomation runs on Monad testnet (chain id 10143)
+# ==========================================================================
+test-settings:
+    rpcs:
+        - chain-name: monad-testnet
+          url: https://testnet-rpc.monad.xyz
+# ==========================================================================
+staging-settings:
+    rpcs:
+        - chain-name: monad-testnet
+          url: https://testnet-rpc.monad.xyz
+# ==========================================================================
+production-settings:
+    rpcs:
+        - chain-name: monad-testnet
+          url: https://testnet-rpc.monad.xyz
