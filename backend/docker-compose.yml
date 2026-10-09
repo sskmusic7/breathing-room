@@ -1,0 +1,18 @@
+# Production runs on the Moltesha droplet (/srv/breathing-room-backend),
+# behind nginx + TLS at breathing-api.178-62-45-130.sslip.io.
+# .env, secrets/ and state/ live only on the server.
+services:
+  api:
+    build: .
+    container_name: breathing-room-backend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8095:8000"
+    env_file: .env
+    environment:
+      BANK_STATE_PATH: /app/state/bank.json
+      TRUELAYER_SIGNING_KEY_PATH: /app/secrets/truelayer_signing_private.pem
+    volumes:
+      - ./state:/app/state
+      - ./secrets:/app/secrets:ro
+    mem_limit: 600m

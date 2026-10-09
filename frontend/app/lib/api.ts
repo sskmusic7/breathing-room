@@ -122,6 +122,8 @@ export const SFS_RESULT_STORAGE_KEY = "br_last_sfs_result";
 
 export interface BankStatus {
   configured: boolean;
+  providers: { name: string; label: string }[];
+  collector: string | null;
   bank_connected: boolean;
   mandate_status: string | null;
   plan: { pot_address: string; surplus_gbp: number } | null;
@@ -149,7 +151,13 @@ export const getBankSummary = (wallet: string) =>
     `/summary?wallet=${encodeURIComponent(wallet)}`
   );
 
-export const startBankMandate = (body: { wallet: string; name: string; email: string; max_monthly_gbp: number }) =>
+export const startBankMandate = (body: {
+  wallet: string;
+  name: string;
+  email: string;
+  max_monthly_gbp: number;
+  provider?: string;
+}) =>
   bankFetch<{ url: string }>("/mandate", { method: "POST", body: JSON.stringify(body) });
 
 export const saveBankPlan = (body: { wallet: string; pot_address: string; surplus_gbp: number }) =>

@@ -28,6 +28,7 @@ export default function BankAutopay({
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState(defaultEmail ?? "");
+  const [provider, setProvider] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -55,7 +56,8 @@ export default function BankAutopay({
     setBusy(true);
     setError(null);
     try {
-      const { url } = await startBankMandate({ wallet, name, email, max_monthly_gbp: surplusGbp });
+      const chosen = provider ?? status?.providers[0]?.name;
+      const { url } = await startBankMandate({ wallet, name, email, max_monthly_gbp: surplusGbp, provider: chosen });
       window.location.href = url;
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -110,6 +112,8 @@ export default function BankAutopay({
           </p>
           {!surplusGbp ? (
             <p className="text-sm text-slate-400">Work out your budget first so we know your surplus.</p>
+          ) : status.providers.length === 0 ? (
+            <p className="text-sm text-slate-400">Payment collection is being set up on our side. Check back shortly.</p>
           ) : (
             <div className="grid grid-cols-2 gap-2">
               <label className="text-sm">
@@ -128,6 +132,23 @@ export default function BankAutopay({
                   className="w-full rounded border border-slate-300 dark:border-slate-600 bg-transparent px-2 py-1 mt-1"
                 />
               </label>
+              {status.providers.length > 1 && (
+                <fieldset className="col-span-2 text-sm">
+                  <legend className="mb-1">How should we collect?</legend>
+                  {status.providers.map((p) => (
+                    <label key={p.name} className="mr-4">
+                      <input
+                        type="radio"
+                        name="provider"
+                        checked={(provider ?? status.providers[0].name) === p.name}
+                        onChange={() => setProvider(p.name)}
+                        className="mr-1"
+                      />
+                      {p.label}
+                    </label>
+                  ))}
+                </fieldset>
+              )}
               <button onClick={onApprove} disabled={busy || !name || !email} className={`col-span-2 ${button}`}>
                 {busy ? "Opening your bank…" : "Approve in my bank"}
               </button>

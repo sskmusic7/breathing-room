@@ -54,16 +54,17 @@ def _env(name: str) -> str:
     return value
 
 
-def is_configured() -> bool:
-    names = (
-        "TRUELAYER_CLIENT_ID",
-        "TRUELAYER_CLIENT_SECRET",
-        "TRUELAYER_SIGNING_KEY_ID",
-        "TRUELAYER_SIGNING_KEY_PATH",
-        "TRUELAYER_MERCHANT_ACCOUNT_ID",
-        "TRUELAYER_DATA_REDIRECT_URI",
+def data_configured() -> bool:
+    """Bank linking + payday detection (Data API is self-serve in sandbox)."""
+    return all(os.environ.get(n) for n in ("TRUELAYER_CLIENT_ID", "TRUELAYER_CLIENT_SECRET", "TRUELAYER_DATA_REDIRECT_URI"))
+
+
+def payments_configured() -> bool:
+    """VRP collection (Payments API is sales-gated on TrueLayer)."""
+    return data_configured() and all(
+        os.environ.get(n)
+        for n in ("TRUELAYER_SIGNING_KEY_ID", "TRUELAYER_SIGNING_KEY_PATH", "TRUELAYER_MERCHANT_ACCOUNT_ID")
     )
-    return all(os.environ.get(n) for n in names)
 
 
 def _b64url(data: bytes) -> str:

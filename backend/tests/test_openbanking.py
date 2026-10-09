@@ -59,36 +59,50 @@ def test_summarise_budget_splits_fixed_and_flexible():
     assert payday.summarise_budget(txs) == {"employment": 1800.0, "fixed_costs": 800.0, "flexible_costs": 250.5}
 
 
+class FakeCollector:
+    name = "fake"
+
+    def __init__(self):
+        self.collected = []
+        self.status = "pending"
+
+    def collect(self, mandate_ref, amount_gbp, reference):
+        self.collected.append((mandate_ref, amount_gbp))
+        return "p-1"
+
+    def payment_status(self, payment_id):
+        return self.status
+
+
 @pytest.fixture
-def bank_state(tmp_path, monkeypatch):
+def fake_collector(tmp_path, monkeypatch):
     monkeypatch.setattr(store, "STATE_PATH", tmp_path / "bank.json")
+    fake = FakeCollector()
+    monkeypatch.setitem(payday.collectors.ALL, "fake", fake)
     store.update(
         WALLET,
         tokens={"access_token": "t", "refresh_token": "r", "expires_at": 9e12},
-        mandate_id="m-1",
+        collector="fake",
+        mandate_ref="m-1",
         mandate_status="authorized",
-        tl_user_id="u-1",
         plan={"pot_address": POT, "surplus_gbp": 495.0},
     )
+    return fake
 
 
-def test_cycle_collects_surplus_on_payday_then_onramps_once_executed(bank_state, monkeypatch):
+def test_cycle_collects_surplus_on_payday_then_onramps_once_executed(fake_collector, monkeypatch):
     monkeypatch.setattr(truelayer, "get_transactions", lambda token, days=35: [
         {"transaction_id": "pay-1", "amount": 1800, "description": "SALARY", "timestamp": "2026-10-01"},
     ])
-    created = []
-    monkeypatch.setattr(truelayer, "create_mandate_payment",
-                        lambda mandate_id, amount, user_id, ref: created.append((mandate_id, amount)) or {"id": "p-1"})
     payday.run_cycle(WALLET)
-    assert created == [("m-1", 495.0)]  # only the surplus, never the whole salary
+    assert fake_collector.collected == [("m-1", 495.0)]  # only the surplus, never the whole salary
     assert store.get(WALLET)["pending_payment"]["id"] == "p-1"
 
-    monkeypatch.setattr(truelayer, "get_payment", lambda pid: {"status": "authorized"})
-    payday.run_cycle(WALLET)  # still pending at TrueLayer -> nothing new
-    assert len(created) == 1
+    payday.run_cycle(WALLET)  # still pending -> nothing new
+    assert len(fake_collector.collected) == 1
 
     sent = []
-    monkeypatch.setattr(truelayer, "get_payment", lambda pid: {"status": "executed"})
+    fake_collector.status = "executed"
     monkeypatch.setattr(payday.onramp, "send_to_pot", lambda pot, gbp: sent.append((pot, gbp)) or "0xtx")
     payday.run_cycle(WALLET)
     assert sent == [(POT, 495.0)]
@@ -96,7 +110,28 @@ def test_cycle_collects_surplus_on_payday_then_onramps_once_executed(bank_state,
     assert record["pending_payment"] is None and record["last_onramp_tx"] == "0xtx"
 
     payday.run_cycle(WALLET)  # same payday is never collected twice
-    assert len(created) == 1
+    assert len(fake_collector.collected) == 1
+
+
+@pytest.mark.parametrize(
+    "collector_cls,raw,expected",
+    [
+        ("GoCardless", "paid_out", "executed"),
+        ("GoCardless", "confirmed", "executed"),
+        ("GoCardless", "pending_submission", "pending"),
+        ("GoCardless", "failed", "failed"),
+        ("StripeBacs", "succeeded", "executed"),
+        ("StripeBacs", "processing", "pending"),
+        ("StripeBacs", "requires_payment_method", "failed"),
+    ],
+)
+def test_payment_status_mapping(collector_cls, raw, expected, monkeypatch):
+    collector = getattr(payday.collectors, collector_cls)()
+    if collector_cls == "GoCardless":
+        monkeypatch.setattr(collector, "_get", lambda path: {"payments": {"status": raw}})
+    else:
+        monkeypatch.setattr(collector, "_get", lambda path, params=None: {"status": raw})
+    assert collector.payment_status("x") == expected
 
 
 def test_bank_endpoints_503_until_configured(monkeypatch):

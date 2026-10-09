@@ -3,13 +3,12 @@ see status. Users are identified by their (Privy embedded) wallet address."""
 from __future__ import annotations
 
 import os
-import uuid
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 
-from . import onramp, payday, store, truelayer
+from . import collectors, onramp, payday, store, truelayer
 
 router = APIRouter(prefix="/bank", tags=["bank"])
 
@@ -17,7 +16,7 @@ FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
 
 
 def _require_config() -> None:
-    if not (truelayer.is_configured() and onramp.is_configured()):
+    if not (truelayer.data_configured() and onramp.is_configured()):
         raise HTTPException(status_code=503, detail="Open Banking is not configured on this server yet")
 
 
@@ -48,17 +47,24 @@ class MandateRequest(BaseModel):
     name: str = Field(min_length=1)
     email: str = Field(min_length=3)
     max_monthly_gbp: float = Field(gt=0)
+    provider: str | None = None
 
 
 @router.post("/mandate")
 def mandate(req: MandateRequest) -> dict:
     _require_config()
     wallet = _wallet(req.wallet)
-    record = store.get(wallet)
-    tl_user_id = record.get("tl_user_id") or str(uuid.uuid4())
-    created = truelayer.create_mandate({"id": tl_user_id, "name": req.name, "email": req.email}, req.max_monthly_gbp)
-    store.update(wallet, tl_user_id=tl_user_id, mandate_id=created["id"], mandate_status=created.get("status"))
-    return {"url": truelayer.mandate_hpp_url(created["id"], created["resource_token"], f"{FRONTEND_URL}/sweep")}
+    name = req.provider or collectors.default_name()
+    if name not in collectors.ALL or not collectors.ALL[name].configured():
+        raise HTTPException(status_code=503, detail="No payment collection provider is configured yet")
+    try:
+        mandate_ref, url = collectors.ALL[name].start(
+            wallet, {"name": req.name, "email": req.email}, req.max_monthly_gbp
+        )
+    except (collectors.CollectorError, truelayer.TrueLayerError) as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    store.update(wallet, collector=name, mandate_ref=mandate_ref, mandate_status="pending")
+    return {"url": url}
 
 
 class PlanRequest(BaseModel):
@@ -78,18 +84,20 @@ def plan(req: PlanRequest) -> dict:
 def status(wallet: str) -> dict:
     wallet = _wallet(wallet)
     record = store.get(wallet)
-    if record.get("mandate_id") and record.get("mandate_status") != "authorized" and truelayer.is_configured():
+    if record.get("mandate_ref") and record.get("mandate_status") != "authorized":
         try:
-            mandate_status = truelayer.get_mandate(record["mandate_id"]).get("status")
+            mandate_status = collectors.ALL[record["collector"]].mandate_status(record["mandate_ref"])
             if mandate_status != record.get("mandate_status"):
                 record = store.update(wallet, mandate_status=mandate_status)
                 if mandate_status == "authorized":
                     store.add_event(wallet, "Automatic payday collection approved in your bank.")
                     record = store.get(wallet)
-        except truelayer.TrueLayerError:
+        except (collectors.CollectorError, truelayer.TrueLayerError):
             pass
     return {
-        "configured": truelayer.is_configured() and onramp.is_configured(),
+        "configured": truelayer.data_configured() and onramp.is_configured(),
+        "providers": collectors.available(),
+        "collector": record.get("collector"),
         "bank_connected": bool(record.get("tokens")),
         "mandate_status": record.get("mandate_status"),
         "plan": record.get("plan"),
@@ -119,6 +127,6 @@ def check_now(wallet: str) -> dict:
     wallet = _wallet(wallet)
     try:
         payday.run_cycle(wallet)
-    except truelayer.TrueLayerError as exc:
+    except (collectors.CollectorError, truelayer.TrueLayerError) as exc:
         store.add_event(wallet, f"Payday check hit a problem: {exc}"[:300])
     return status(wallet)

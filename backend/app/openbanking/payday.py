@@ -7,17 +7,16 @@ One cycle per linked user (run every couple of minutes, or on demand):
   2. Otherwise read recent transactions; on a new payday credit, collect
      the user's planned surplus over their VRP mandate.
 Only the surplus is ever collected: essentials stay in the user's bank.
+Collection goes through whichever provider the user approved (collectors.py).
 """
 from __future__ import annotations
 
 import re
 
-from . import onramp, store, truelayer
+from . import collectors, onramp, store, truelayer
 
 SALARY_PATTERN = re.compile(r"salary|payroll|wages|pay\b|bacs", re.IGNORECASE)
 MIN_PAYDAY_GBP = 300.0
-EXECUTED = {"executed", "settled"}
-FAILED = {"failed"}
 
 
 def summarise_budget(transactions: list[dict]) -> dict:
@@ -58,14 +57,15 @@ def run_cycle(wallet: str) -> None:
     if not plan.get("pot_address") or not plan.get("surplus_gbp"):
         return
 
+    collector = collectors.ALL[record["collector"]]
     pending = record.get("pending_payment")
     if pending:
-        status = truelayer.get_payment(pending["id"]).get("status", "")
-        if status in EXECUTED:
+        status = collector.payment_status(pending["id"])
+        if status == "executed":
             tx = onramp.send_to_pot(plan["pot_address"], pending["amount_gbp"])
             store.update(wallet, pending_payment=None, last_onramp_tx=tx)
             store.add_event(wallet, f"£{pending['amount_gbp']:.2f} collected from your bank and moved into your pot. Chainlink will pay your creditors within a couple of minutes.")
-        elif status in FAILED:
+        elif status == "failed":
             store.update(wallet, pending_payment=None)
             store.add_event(wallet, f"Bank collection of £{pending['amount_gbp']:.2f} failed. Nothing was taken.")
         return
@@ -79,11 +79,11 @@ def run_cycle(wallet: str) -> None:
         return
 
     amount = min(float(plan["surplus_gbp"]), float(payday["amount"]))
-    payment = truelayer.create_mandate_payment(record["mandate_id"], amount, record["tl_user_id"], "BR PAYDAY")
+    payment_id = collector.collect(record["mandate_ref"], amount, "BR PAYDAY")
     store.update(
         wallet,
         processed_paydays=[*processed, payday["transaction_id"]],
-        pending_payment={"id": payment["id"], "amount_gbp": amount, "payday_id": payday["transaction_id"]},
+        pending_payment={"id": payment_id, "amount_gbp": amount, "payday_id": payday["transaction_id"]},
     )
     store.add_event(
         wallet,
