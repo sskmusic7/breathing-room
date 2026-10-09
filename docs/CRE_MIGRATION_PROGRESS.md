@@ -59,3 +59,9 @@ Old session log: ~/.claude/projects/-Users-sskmusic/1e858211-4ab0-4288-881c-08db
 - Console redirect URIs: https://breathing-api.178-62-45-130.sslip.io/bank/callback (bank link) AND https://breathing-room-peach.vercel.app/sweep (mandate return)
 - NOT yet run against real TrueLayer: mandate body shape (use_case / user_interaction placement) is from docs and may need a tweak on first call
 - WARNING: this Mac corrupts large file writes (see memory). Build on Vercel/droplet only
+
+## Interim automation moved to the droplet (2026-10-09)
+- Runs on Moltesha every 2 min via /etc/cron.d/breathing-room-cre -> /srv/breathing-room-cre/run.sh (copy in automation-cre/breathing-room-automation/droplet-run.sh). Log: /var/log/breathing-room-cre.log (self-capped at 2MB). ~200MB RAM for ~5s per run
+- CRE CLI v1.38.0 at /root/.cre/bin/cre, logged in by copying ~/.cre/cre.yaml + context.yaml from the Mac. If the login expires there, re-run `cre login` on the Mac and re-copy those two files
+- The Mac loop (run-sweep-check.sh --loop) is no longer needed
+- When deploy access lands: deploy to the Chainlink network, switch the receiver back to the production forwarder + real owner, then `rm /etc/cron.d/breathing-room-cre`
