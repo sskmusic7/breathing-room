@@ -11,7 +11,7 @@ configured. Each provider:
 
 - gocardless: UK Direct Debit (Billing Request Flow). Sandbox is self-serve.
 - stripe:     Bacs Direct Debit via Checkout (setup mode), test mode.
-- truelayer:  commercial VRP mandate (Payments API v3; sales-gated).
+- truelayer:  sweeping VRP mandate (Payments API v3).
 """
 from __future__ import annotations
 

@@ -5,8 +5,11 @@ Two separate products, both through TrueLayer as the FCA-authorised provider
 
 - Data API (read-only, AISP): the user links their bank once; we read
   transactions to spot payday and to fill in the SFS budget.
-- Payments API v3 (PISP): the user authorises one capped commercial VRP
-  mandate; on each payday we take only the surplus over that mandate.
+- Payments API v3 (PISP): the user authorises one capped *sweeping* VRP
+  mandate (me-to-me: their bank -> their own account at the on-ramp that
+  funds their pot); on each payday we take only the surplus over it.
+  Sweeping works in sandbox without TrueLayer sales enabling commercial VRP
+  or a merchant account.
 
 Payments requests must carry a `Tl-Signature` (detached JWS, ES512). The
 official `truelayer-signing` package pins a cryptography version that won't
@@ -33,7 +36,7 @@ API_URL = "https://api.truelayer-sandbox.com"
 HPP_URL = "https://payment.truelayer-sandbox.com"
 
 DATA_SCOPES = "info accounts balance transactions offline_access"
-PAYMENTS_SCOPES = "payments recurring_payments:commercial"
+PAYMENTS_SCOPES = "payments recurring_payments:sweeping"
 # uk-cs-mock = TrueLayer's fictitious Mock Bank, so it shows up in sandbox.
 DATA_PROVIDERS = "uk-cs-mock uk-ob-all uk-oauth-all"
 VRP_PROVIDER = "ob-uki-mock-bank-sbox"
@@ -63,7 +66,7 @@ def payments_configured() -> bool:
     """VRP collection (Payments API is sales-gated on TrueLayer)."""
     return data_configured() and all(
         os.environ.get(n)
-        for n in ("TRUELAYER_SIGNING_KEY_ID", "TRUELAYER_SIGNING_KEY_PATH", "TRUELAYER_MERCHANT_ACCOUNT_ID")
+        for n in ("TRUELAYER_SIGNING_KEY_ID", "TRUELAYER_SIGNING_KEY_PATH")
     )
 
 
@@ -170,18 +173,23 @@ def _get(path: str) -> dict:
 
 
 def create_mandate(user: dict, max_monthly_gbp: float) -> dict:
-    """Commercial VRP mandate paying into our sandbox merchant account,
-    capped at the user's own monthly surplus."""
+    """Sweeping VRP mandate into the user's on-ramp account, capped at their
+    own monthly surplus. (No `reference`: TrueLayer only allows it for
+    regulated clients.)"""
     cap_minor = int(round(max_monthly_gbp * 100))
     body = {
         "mandate": {
-            "type": "commercial",
+            "type": "sweeping",
             "provider_selection": {"type": "preselected", "provider_id": VRP_PROVIDER},
             "beneficiary": {
-                "type": "merchant_account",
-                "merchant_account_id": _env("TRUELAYER_MERCHANT_ACCOUNT_ID"),
+                "type": "external_account",
+                "account_holder_name": "Breathing Room pot top-up",
+                "account_identifier": {
+                    "type": "sort_code_account_number",
+                    "sort_code": os.environ.get("ONRAMP_SORT_CODE", "040668"),
+                    "account_number": os.environ.get("ONRAMP_ACCOUNT_NUMBER", "00000871"),
+                },
             },
-            "reference": "BREATHINGROOM",
         },
         "currency": "GBP",
         "user": user,
@@ -189,8 +197,6 @@ def create_mandate(user: dict, max_monthly_gbp: float) -> dict:
             "maximum_individual_amount": cap_minor,
             "periodic_limits": {"month": {"maximum_amount": cap_minor, "period_alignment": "calendar"}},
         },
-        "use_case": "financial_services",
-        "user_interaction": "not_present",
     }
     return _signed_post("/v3/mandates", body)
 
@@ -214,7 +220,6 @@ def create_mandate_payment(mandate_id: str, amount_gbp: float, user_id: str, ref
             "type": "mandate",
             "mandate_id": mandate_id,
             "reference": reference[:18],
-            "user_interaction": "not_present",
         },
         "user": {"id": user_id},
     }
