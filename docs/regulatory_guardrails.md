@@ -52,7 +52,7 @@ plan for.
   `setCreditors`. Breathing Room the company is never a money-transmission
   business.
 
-## What's NOT built yet (be honest with judges about this)
+## What's NOT built yet
 
 - No live Open Banking integration (`app/openbanking/` is an empty stub) -
   the SFS calculator accepts manually-entered or mocked income/outgoings

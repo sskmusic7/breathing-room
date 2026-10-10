@@ -12,7 +12,7 @@
 - ~~Connect Alchemy - RPC alias + Notify webhook receiver (8/8 tests)~~
 - ~~Add Pauline (`112358132135`) as a repo collaborator, write access~~
 
-## You (Kayah) — quick, ~10 min
+## Kayah — quick, ~10 min
 
 - [ ] Faucet: paste `0x8960b2bbb4d1c1d9c20B23835680465Ad98F95AF` at
       faucet.monad.xyz, solve the CAPTCHA, request MON.

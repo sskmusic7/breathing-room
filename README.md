@@ -118,11 +118,10 @@ breathing-room/
   passkey/email login with a hidden embedded wallet - exactly what the
   Consumer Products track and the Privy bounty want (crypto invisible to
   the end user). **UI screens (camera scan, SFS dashboard, appeal review)
-  are not built yet** - that's real, opinionated UX work better done with
-  you reviewing it than guessed overnight. See `frontend/README.md` for the
+  are not built yet**. See `frontend/README.md` for the
   template's own setup instructions.
 
-## What's still needed (honest list, in priority order)
+## What's still needed (in priority order)
 
 1. **A Privy account + `NEXT_PUBLIC_PRIVY_APP_ID`** - go to
    [dashboard.privy.io](https://dashboard.privy.io), create an app, drop the
