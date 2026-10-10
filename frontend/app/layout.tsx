@@ -14,10 +14,10 @@ const geistMono = localFont({
   weight: "100 900",
 });
 
-const APP_NAME = "PWA App";
-const APP_DEFAULT_TITLE = "My Awesome PWA App";
-const APP_TITLE_TEMPLATE = "%s - PWA App";
-const APP_DESCRIPTION = "Best PWA app in the world!";
+const APP_NAME = "Breathing Room";
+const APP_DEFAULT_TITLE = "Breathing Room";
+const APP_TITLE_TEMPLATE = "%s - Breathing Room";
+const APP_DESCRIPTION = "Debts managed, on autopilot.";
 
 export const metadata: Metadata = {
   applicationName: APP_NAME,

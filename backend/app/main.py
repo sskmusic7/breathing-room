@@ -45,9 +45,21 @@ def calculate_sfs_endpoint(request: SfsRequest) -> SfsResult:
     return calculate_sfs(request)
 
 
+# Mitigating-circumstance fields that count as special category health data
+# (UK GDPR Art.9) - only accepted alongside explicit, standalone consent.
+HEALTH_DATA_FIELDS = ("neurodivergence_or_disability", "dependant_crisis")
+
+
 @app.post("/draft-appeal")
 def draft_appeal_endpoint(facts: dict) -> dict:
-    mitigating = MitigatingCircumstances(**facts.pop("mitigating", {}))
+    consent = facts.pop("health_data_consent", False) is True
+    mitigating_raw = facts.pop("mitigating", {}) or {}
+    if not consent and any(mitigating_raw.get(f) for f in HEALTH_DATA_FIELDS):
+        raise HTTPException(
+            status_code=400,
+            detail="Health/neurodivergence details require explicit consent (health_data_consent: true).",
+        )
+    mitigating = MitigatingCircumstances(**mitigating_raw)
     notice_facts = NoticeFacts(mitigating=mitigating, **facts)
     return draft_representation_letter(notice_facts)
 
