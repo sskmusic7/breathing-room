@@ -56,7 +56,20 @@ def test_summarise_budget_splits_fixed_and_flexible():
         {"amount": -100, "transaction_category": "DIRECT_DEBIT"},
         {"amount": -250.5, "transaction_category": "PURCHASE"},
     ]
-    assert payday.summarise_budget(txs) == {"employment": 1800.0, "fixed_costs": 800.0, "flexible_costs": 250.5}
+    assert payday.summarise_budget(txs) == {"employment": 1800.0, "fixed_costs": 800.0, "flexible_costs": 250.5, "months": 1.0}
+
+
+def test_summarise_budget_averages_three_months():
+    txs = [
+        {"amount": 1500, "timestamp": "2026-07-01T00:00:00Z"},
+        {"amount": 2100, "timestamp": "2026-08-01T00:00:00Z"},
+        {"amount": 1800, "timestamp": "2026-09-30T00:00:00Z"},
+        {"amount": -900, "transaction_category": "STANDING_ORDER", "timestamp": "2026-09-01T00:00:00Z"},
+    ]
+    summary = payday.summarise_budget(txs)
+    assert summary["months"] == 3.0
+    assert summary["employment"] == 1800.0  # (1500 + 2100 + 1800) / 3
+    assert summary["fixed_costs"] == 300.0
 
 
 class FakeCollector:

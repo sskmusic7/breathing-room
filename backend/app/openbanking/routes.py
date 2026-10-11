@@ -114,7 +114,7 @@ def status(wallet: str) -> dict:
 
 @router.get("/summary")
 def summary(wallet: str) -> dict:
-    """Last ~30 days of real transactions summarised for the SFS form."""
+    """Last ~3 months of real transactions, averaged per month, for the SFS form."""
     _require_config()
     wallet = _wallet(wallet)
     record = store.get(wallet)
@@ -123,7 +123,7 @@ def summary(wallet: str) -> dict:
     tokens = truelayer.refresh_data_tokens(record["tokens"])
     if tokens is not record["tokens"]:
         store.update(wallet, tokens=tokens)
-    return payday.summarise_budget(truelayer.get_transactions(tokens["access_token"], days=30))
+    return payday.summarise_budget(truelayer.get_transactions(tokens["access_token"], days=90))
 
 
 @router.post("/check-now")

@@ -12,6 +12,7 @@ Collection goes through whichever provider the user approved (collectors.py).
 from __future__ import annotations
 
 import re
+from datetime import datetime
 
 from . import collectors, onramp, store, truelayer
 
@@ -20,7 +21,9 @@ MIN_PAYDAY_GBP = 300.0
 
 
 def summarise_budget(transactions: list[dict]) -> dict:
-    """Monthly income / fixed / flexible outgoings from real transactions, for the SFS form."""
+    """Average monthly income / fixed / flexible outgoings from real
+    transactions, for the SFS form. Averages over the span the bank actually
+    returned (1 to 3 months), which smooths irregular income."""
     fixed_categories = {"DIRECT_DEBIT", "STANDING_ORDER", "BILL_PAYMENT"}
     income = fixed = flexible = 0.0
     for t in transactions:
@@ -31,7 +34,15 @@ def summarise_budget(transactions: list[dict]) -> dict:
             fixed += -amount
         else:
             flexible += -amount
-    return {"employment": round(income, 2), "fixed_costs": round(fixed, 2), "flexible_costs": round(flexible, 2)}
+    dates = sorted(datetime.fromisoformat(t["timestamp"].replace("Z", "+00:00")) for t in transactions if t.get("timestamp"))
+    span_days = (dates[-1] - dates[0]).days if len(dates) > 1 else 30
+    months = min(3.0, max(1.0, round(span_days / 30.4, 1)))
+    return {
+        "employment": round(income / months, 2),
+        "fixed_costs": round(fixed / months, 2),
+        "flexible_costs": round(flexible / months, 2),
+        "months": round(months, 1),
+    }
 
 
 def find_payday(transactions: list[dict], processed: set[str]) -> dict | None:

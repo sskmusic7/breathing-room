@@ -143,7 +143,7 @@ export default function SfsPage() {
         <section className="bg-white dark:bg-slate-800 rounded-lg p-4 mb-6 shadow-sm">
           <h2 className="font-semibold text-slate-700 dark:text-slate-200">Don&apos;t know your numbers?</h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-            Let us fill this in from your bank&apos;s last 30 days. Read-only, through TrueLayer (FCA authorised).
+            Let us fill this in from your last 3 months of bank transactions, averaged per month. Read-only, through TrueLayer (FCA authorised).
             You can change anything after.
           </p>
           {!user ? (
@@ -168,7 +168,7 @@ export default function SfsPage() {
           )}
           {autoState === "filled" && (
             <p className="mt-2 text-xs text-green-700 dark:text-green-400">
-              Filled from your bank. Check the numbers below look right.
+              Filled from your bank (monthly average). Check the numbers below look right.
             </p>
           )}
           {autoState === "error" && (
