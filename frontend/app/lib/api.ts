@@ -131,8 +131,8 @@ export interface BankStatus {
   events: { at: string; text: string }[];
 }
 
-export const bankConnectUrl = (wallet: string) =>
-  `${API_URL}/bank/connect?wallet=${encodeURIComponent(wallet)}`;
+export const bankConnectUrl = (wallet: string, next: "sweep" | "sfs" = "sweep") =>
+  `${API_URL}/bank/connect?wallet=${encodeURIComponent(wallet)}&next=${next}`;
 
 async function bankFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}/bank${path}`, {

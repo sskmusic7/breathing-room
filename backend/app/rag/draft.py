@@ -67,44 +67,116 @@ def _retrieve_context(facts: NoticeFacts) -> list[RetrievedDoc]:
     return query_legal_corpus(" ".join(query_parts), issuer_type=facts.issuer_type, n_results=4)
 
 
-def _template_fallback(facts: NoticeFacts, context: list[RetrievedDoc]) -> str:
-    citations = "; ".join(f"{d.metadata.get('title')} ({d.metadata.get('citation')})" for d in context)
-    mitigating_paragraph = ""
-    if facts.mitigating.neurodivergence_or_disability:
-        mitigating_paragraph = (
-            "\n\nI am also raising, under the Equality Act 2010 (sections 20-21 and the "
-            "Public Sector Equality Duty at section 149), that the following factor "
-            f"affected my ability to comply at the time: {facts.mitigating.neurodivergence_or_disability}. "
-            "I would ask you to have due regard to this when considering my representation."
-        )
-
-    code_suffix = f" (code {facts.contravention_code})" if facts.contravention_code else ""
-
-    return f"""Dear Sir/Madam,
-
-Re: {facts.stage_of_notice.replace('_', ' ').title()} - Reference {facts.reference_number or '[reference]'}
-
-I am writing to make formal representations regarding the above notice, issued by \
-{facts.issuer_name} on {facts.date_of_notice or '[date]'} in relation to an alleged \
-contravention on {facts.date_of_contravention or '[date]'}{code_suffix}.
-
-[DRAFT ONLY - review, personalise, and sign before sending. Generated without a
-configured LLM provider; set MOONSHOT_API_KEY to enable full KIMI-drafted
-representations grounded in the statutory context below.]
-
-Relevant statutory context considered: {citations}
-{mitigating_paragraph}
-
-I would be grateful if you would confirm receipt of this representation and
-advise of the outcome in writing.
+SIGN_OFF = """
+I would be grateful if you would confirm receipt of this letter and let me know \
+the outcome in writing.
 
 Yours faithfully,
-[Your name]
+[Your name]"""
 
----
-Breathing Room provides legal information and software tools, not legal
-advice. You are responsible for reviewing and sending your own appeals.
-"""
+HANDOFF_STAGES = {"county_court_claim"}
+HANDOFF_ISSUERS = {"enforcement_agent", "court"}
+
+
+def _grounds(facts: NoticeFacts) -> list[str]:
+    m = facts.mitigating
+    grounds = []
+    if m.signage_obscured:
+        grounds.append(
+            "The signs and/or road markings at the location were missing, obscured or unclear, "
+            "so the restriction was not adequately indicated. I would ask you to check the "
+            "signage at this location and provide photographs of it as it was on the day."
+        )
+    if m.was_loading:
+        grounds.append(
+            "I was actively loading or unloading at the time, which is a recognised exemption "
+            "for this type of restriction."
+        )
+    if m.emergency_pickup:
+        grounds.append("I stopped only because of a genuine emergency, which I can explain and evidence if needed.")
+    if m.holds_blue_badge:
+        grounds.append("I hold a valid Blue Badge, which I can provide a copy of.")
+    if m.neurodivergence_or_disability:
+        grounds.append(
+            "Under the Equality Act 2010, I ask you to take into account that the following affected "
+            f"my ability to comply at the time: {m.neurodivergence_or_disability}."
+        )
+    if m.dependant_crisis:
+        grounds.append(f"At the time I was dealing with a crisis involving someone I care for: {m.dependant_crisis}.")
+    if m.other_notes:
+        grounds.append(m.other_notes)
+    return grounds
+
+
+def _template_fallback(facts: NoticeFacts, context: list[RetrievedDoc]) -> str:
+    """Plain, user-facing letter (no developer notes) when no LLM is configured."""
+    if facts.issuer_type in HANDOFF_ISSUERS or facts.stage_of_notice in HANDOFF_STAGES:
+        return (
+            "This kind of letter needs a person, not a template.\n\n"
+            "Bailiff (enforcement agent) letters and court claims have strict deadlines and "
+            "specific forms. Please contact National Debtline (0808 808 4000) or Citizens Advice "
+            "today. Both are free. If you're struggling with your mental health, ask about "
+            "Breathing Space, which can pause most creditor action for 60 days."
+        )
+
+    ref = facts.reference_number or "[reference]"
+    amount = f" for £{facts.amount_gbp}" if facts.amount_gbp else ""
+    numbered = "\n\n".join(f"{i}. {g}" for i, g in enumerate(_grounds(facts), 1)) or (
+        "[In your own words: why should this be cancelled? For example, what happened, "
+        "and anything that made the sign hard to follow.]"
+    )
+
+    if facts.issuer_type == "creditor":
+        return f"""Dear Sir/Madam,
+
+Re: Account reference {ref}
+
+I am writing about the above account{amount}. I am experiencing financial difficulty \
+and want to agree an affordable repayment plan.
+
+I am preparing a Standard Financial Statement, which shows what I can afford after my \
+essential living costs, and I will send it to you. In the meantime, please put this \
+account on hold for 30 days, stop any interest and charges, and do not pass it to a \
+collection agency while we agree a plan.
+{chr(10) + numbered + chr(10) if _grounds(facts) else ""}{SIGN_OFF}"""
+
+    if facts.issuer_type == "private_parking_operator":
+        return f"""Dear Sir/Madam,
+
+Re: Parking charge {ref}{amount}
+
+I am writing to appeal the above parking charge, issued by {facts.issuer_name} \
+for an alleged breach on {facts.date_of_contravention or '[date]'}.
+
+{numbered}
+
+If you intend to hold the registered keeper liable, I ask you to confirm that you \
+have met every requirement of Schedule 4 of the Protection of Freedoms Act 2012. \
+If you reject this appeal, please provide a POPLA or IAS appeal code so I can take \
+it to the independent appeals service.
+{SIGN_OFF}"""
+
+    stage = facts.stage_of_notice.replace("_", " ")
+    formal = facts.stage_of_notice in {"notice_to_owner", "charge_certificate"}
+    intro = (
+        "I am writing to make formal representations against the above notice under the "
+        "Traffic Management Act 2004"
+        if formal
+        else "I am writing to challenge the above penalty charge notice"
+    )
+    code = f" (contravention code {facts.contravention_code})" if facts.contravention_code else ""
+    return f"""Dear Sir/Madam,
+
+Re: {stage[0].upper() + stage[1:]} {ref}{amount}
+
+{intro}, issued by {facts.issuer_name} on {facts.date_of_notice or '[date]'} for an \
+alleged contravention on {facts.date_of_contravention or '[date]'}{code}.
+
+{numbered}
+
+I ask you to cancel this notice. If you do not, please confirm that the reduced \
+payment amount will remain available while you consider this.
+{SIGN_OFF}"""
 
 
 def draft_representation_letter(facts: NoticeFacts) -> dict:

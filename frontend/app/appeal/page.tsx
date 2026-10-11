@@ -44,7 +44,21 @@ export default function AppealPage() {
         // Only ever send mitigating fields once consent has been explicitly
         // given — if consent is withheld, submit an empty object so no
         // special-category data is included at all.
-        mitigating: consentGiven ? mitigating : {},
+        // Reasons (sign, loading, emergency, notes) are always sent; health and
+        // personal-circumstance fields only once consent has been given.
+        mitigating: {
+          emergency_pickup: mitigating.emergency_pickup,
+          signage_obscured: mitigating.signage_obscured,
+          was_loading: mitigating.was_loading,
+          other_notes: mitigating.other_notes,
+          ...(consentGiven
+            ? {
+                holds_blue_badge: mitigating.holds_blue_badge,
+                neurodivergence_or_disability: mitigating.neurodivergence_or_disability,
+                dependant_crisis: mitigating.dependant_crisis,
+              }
+            : {}),
+        },
       });
       setResult(draft);
     } catch (err) {
@@ -127,9 +141,37 @@ export default function AppealPage() {
           </section>
 
           <section className="bg-white dark:bg-slate-800 rounded-lg p-4 space-y-3 shadow-sm">
+            <h2 className="font-semibold text-slate-700 dark:text-slate-200">Why should it be cancelled?</h2>
+            <p className="text-xs text-slate-400">Tick anything that applies. Not sure? Leave it and write it in your own words.</p>
+            <div className="grid grid-cols-2 gap-3">
+              <CheckField
+                label="Sign was hard to see"
+                checked={!!mitigating.signage_obscured}
+                onChange={(v) => setMitigating((m) => ({ ...m, signage_obscured: v }))}
+              />
+              <CheckField
+                label="I was loading/unloading"
+                checked={!!mitigating.was_loading}
+                onChange={(v) => setMitigating((m) => ({ ...m, was_loading: v }))}
+              />
+              <CheckField
+                label="It was an emergency"
+                checked={!!mitigating.emergency_pickup}
+                onChange={(v) => setMitigating((m) => ({ ...m, emergency_pickup: v }))}
+              />
+            </div>
+            <TextField
+              label="In your own words (optional)"
+              value={mitigating.other_notes ?? ""}
+              onChange={(v) => setMitigating((m) => ({ ...m, other_notes: v || null }))}
+            />
+          </section>
+
+          <section className="bg-white dark:bg-slate-800 rounded-lg p-4 space-y-3 shadow-sm">
             <h2 className="font-semibold text-slate-700 dark:text-slate-200">
-              Mitigating circumstances (optional)
+              Health or personal circumstances (optional)
             </h2>
+            <p className="text-xs text-slate-400">Leaving this out won&apos;t weaken your letter.</p>
             <label className="flex items-start gap-2 text-sm bg-slate-50 dark:bg-slate-900 rounded p-3">
               <input
                 type="checkbox"
@@ -137,7 +179,13 @@ export default function AppealPage() {
                 checked={consentGiven}
                 onChange={(e) => {
                   setConsentGiven(e.target.checked);
-                  if (!e.target.checked) setMitigating({});
+                  if (!e.target.checked)
+                    setMitigating((m) => ({
+                      ...m,
+                      holds_blue_badge: false,
+                      neurodivergence_or_disability: null,
+                      dependant_crisis: null,
+                    }));
                 }}
               />
               <span>
@@ -148,30 +196,14 @@ export default function AppealPage() {
 
             {!consentGiven && (
               <p className="text-xs text-slate-400">
-                Tick the box above to add any health, neurodivergence, or other
-                personal circumstances — these fields stay hidden until you
-                consent.
+                Tick the box above to add health, disability or caring
+                circumstances. These fields stay hidden until you agree.
               </p>
             )}
 
             {consentGiven && (
               <div className="space-y-3 border-t border-slate-100 dark:border-slate-700 pt-3">
                 <div className="grid grid-cols-2 gap-3">
-                  <CheckField
-                    label="Emergency pickup"
-                    checked={!!mitigating.emergency_pickup}
-                    onChange={(v) => setMitigating((m) => ({ ...m, emergency_pickup: v }))}
-                  />
-                  <CheckField
-                    label="Signage was obscured"
-                    checked={!!mitigating.signage_obscured}
-                    onChange={(v) => setMitigating((m) => ({ ...m, signage_obscured: v }))}
-                  />
-                  <CheckField
-                    label="Was loading/unloading"
-                    checked={!!mitigating.was_loading}
-                    onChange={(v) => setMitigating((m) => ({ ...m, was_loading: v }))}
-                  />
                   <CheckField
                     label="Holds a Blue Badge"
                     checked={!!mitigating.holds_blue_badge}
@@ -189,11 +221,6 @@ export default function AppealPage() {
                   label="Dependant crisis (free text, optional)"
                   value={mitigating.dependant_crisis ?? ""}
                   onChange={(v) => setMitigating((m) => ({ ...m, dependant_crisis: v || null }))}
-                />
-                <TextField
-                  label="Other notes"
-                  value={mitigating.other_notes ?? ""}
-                  onChange={(v) => setMitigating((m) => ({ ...m, other_notes: v || null }))}
                 />
               </div>
             )}
@@ -219,7 +246,7 @@ export default function AppealPage() {
             <p className="text-xs text-slate-400 bg-slate-50 dark:bg-slate-900 rounded p-2">
               This is a draft only. Breathing Room provides legal information and
               software tools, not legal advice — review, personalise, and sign it
-              yourself before sending. {result.used_llm ? "" : "(Generated from the deterministic template — set a KIMI API key for LLM-drafted prose.)"}
+              yourself before sending.
             </p>
             <button
               type="button"

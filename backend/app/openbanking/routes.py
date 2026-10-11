@@ -26,20 +26,26 @@ def _wallet(wallet: str) -> str:
     return wallet.lower()
 
 
+RETURN_PAGES = {"sweep", "sfs"}
+
+
 @router.get("/connect")
-def connect(wallet: str) -> RedirectResponse:
+def connect(wallet: str, next: str = "sweep") -> RedirectResponse:
     _require_config()
-    return RedirectResponse(truelayer.data_auth_link(state=_wallet(wallet)))
+    page = next if next in RETURN_PAGES else "sweep"
+    return RedirectResponse(truelayer.data_auth_link(state=f"{_wallet(wallet)}|{page}"))
 
 
 @router.get("/callback")
 def callback(code: str | None = None, state: str | None = None, error: str | None = None) -> RedirectResponse:
+    wallet_part, _, page = (state or "").partition("|")
+    page = page if page in RETURN_PAGES else "sweep"
     if error or not code or not state:
-        return RedirectResponse(f"{FRONTEND_URL}/sweep?bank=error")
-    wallet = _wallet(state)
+        return RedirectResponse(f"{FRONTEND_URL}/{page}?bank=error")
+    wallet = _wallet(wallet_part)
     store.update(wallet, tokens=truelayer.exchange_code(code))
     store.add_event(wallet, "Bank connected (read-only).")
-    return RedirectResponse(f"{FRONTEND_URL}/sweep?bank=connected")
+    return RedirectResponse(f"{FRONTEND_URL}/{page}?bank=connected")
 
 
 class MandateRequest(BaseModel):

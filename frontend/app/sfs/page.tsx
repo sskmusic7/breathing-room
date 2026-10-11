@@ -1,9 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useLogin, usePrivy, type WalletWithMetadata } from "@privy-io/react-auth";
 import {
+  bankConnectUrl,
   calculateSfs,
+  getBankStatus,
+  getBankSummary,
   SFS_RESULT_STORAGE_KEY,
   type Creditor,
   type DebtCategory,
@@ -43,6 +47,40 @@ export default function SfsPage() {
   const [result, setResult] = useState<SfsResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Auto SFS: fill income/outgoings from the user's real bank transactions
+  // (TrueLayer Data API, read-only) instead of asking them to know the numbers.
+  const { user } = usePrivy();
+  const { login } = useLogin();
+  const wallet = useMemo(() => {
+    const embedded = user?.linkedAccounts.find(
+      (a) => a.type === "wallet" && a.walletClientType === "privy"
+    ) as WalletWithMetadata | undefined;
+    return embedded?.address;
+  }, [user]);
+  const [bankConnected, setBankConnected] = useState(false);
+  const [autoState, setAutoState] = useState<"idle" | "loading" | "filled" | "error">("idle");
+
+  useEffect(() => {
+    if (!wallet) return;
+    getBankStatus(wallet)
+      .then((s) => setBankConnected(s.bank_connected))
+      .catch(() => {});
+  }, [wallet]);
+
+  async function fillFromBank() {
+    if (!wallet) return;
+    setAutoState("loading");
+    try {
+      const summary = await getBankSummary(wallet);
+      setEmploymentIncome(String(summary.employment));
+      setFixedCosts(String(summary.fixed_costs));
+      setFlexibleCosts(String(summary.flexible_costs));
+      setAutoState("filled");
+    } catch {
+      setAutoState("error");
+    }
+  }
 
   function updateCreditor(id: string, patch: Partial<CreditorRow>) {
     setCreditors((rows) => rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
@@ -101,6 +139,42 @@ export default function SfsPage() {
           This tool provides standard SFS calculations. For formal, regulated debt
           advice, contact National Debtline, StepChange, or Citizens Advice.
         </p>
+
+        <section className="bg-white dark:bg-slate-800 rounded-lg p-4 mb-6 shadow-sm">
+          <h2 className="font-semibold text-slate-700 dark:text-slate-200">Don&apos;t know your numbers?</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+            Let us fill this in from your bank&apos;s last 30 days. Read-only, through TrueLayer (FCA authorised).
+            You can change anything after.
+          </p>
+          {!user ? (
+            <button type="button" onClick={() => login()} className="rounded bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 px-4 py-2 font-semibold">
+              Fill from my bank
+            </button>
+          ) : !wallet ? (
+            <p className="text-sm text-slate-400">Setting up your account…</p>
+          ) : !bankConnected ? (
+            <a href={bankConnectUrl(wallet, "sfs")} className="inline-block rounded bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 px-4 py-2 font-semibold">
+              Connect my bank
+            </a>
+          ) : (
+            <button
+              type="button"
+              onClick={fillFromBank}
+              disabled={autoState === "loading"}
+              className="rounded bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 px-4 py-2 font-semibold disabled:opacity-50"
+            >
+              {autoState === "loading" ? "Reading your bank…" : "Fill from my bank"}
+            </button>
+          )}
+          {autoState === "filled" && (
+            <p className="mt-2 text-xs text-green-700 dark:text-green-400">
+              Filled from your bank. Check the numbers below look right.
+            </p>
+          )}
+          {autoState === "error" && (
+            <p className="mt-2 text-xs text-red-600">Couldn&apos;t read your bank just now. You can type the numbers instead.</p>
+          )}
+        </section>
 
         <form onSubmit={onSubmit} className="space-y-6">
           <section className="bg-white dark:bg-slate-800 rounded-lg p-4 space-y-3 shadow-sm">
@@ -211,6 +285,17 @@ export default function SfsPage() {
                 Surplus available for creditors: £{result.surplus_for_creditors}
               </div>
             </div>
+            {Number(result.surplus_for_creditors) <= 0 && (
+              <div className="text-sm bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-900 rounded p-3 space-y-1">
+                <p className="font-semibold text-red-800 dark:text-red-200">
+                  Your essentials use up all your income right now. That&apos;s not your fault, and there are options.
+                </p>
+                <p className="text-red-700 dark:text-red-300">
+                  Talk to a free adviser today: National Debtline 0808 808 4000, or Citizens Advice. Ask about
+                  Breathing Space, which can pause most creditor action, interest and charges for 60 days.
+                </p>
+              </div>
+            )}
             {result.is_token_payment_territory && (
               <p className="text-amber-600 text-sm bg-amber-50 dark:bg-amber-950 rounded p-2">
                 Your disposable income is low enough that token (nominal) payments to
@@ -235,12 +320,14 @@ export default function SfsPage() {
                 ))}
               </tbody>
             </table>
-            <Link
-              href="/sweep"
-              className="inline-block mt-2 text-blue-600 hover:underline text-sm font-semibold"
-            >
-              Set this plan up on-chain →
-            </Link>
+            {Number(result.surplus_for_creditors) > 0 && (
+              <Link
+                href="/sweep"
+                className="inline-block mt-2 text-blue-600 hover:underline text-sm font-semibold"
+              >
+                Put this plan on autopilot →
+              </Link>
+            )}
           </section>
         )}
       </div>
