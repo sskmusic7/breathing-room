@@ -22,6 +22,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.openbanking import payday as bank_payday
 from app.openbanking.routes import router as bank_router
+from app.payouts import worker as payout_worker
+from app.payouts.routes import router as payouts_router
 from app.rag.draft import MitigatingCircumstances, NoticeFacts, draft_representation_letter
 from app.rag.query import query_legal_corpus
 from app.sfs_engine.calculator import calculate_sfs
@@ -35,6 +37,7 @@ async def _payday_loop() -> None:
     while True:
         await asyncio.sleep(PAYDAY_CHECK_SECONDS)
         await asyncio.to_thread(bank_payday.run_all)
+        await asyncio.to_thread(payout_worker.run_all)
 
 
 @asynccontextmanager
@@ -47,6 +50,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="Breathing Room API", version="0.1.0", lifespan=lifespan)
 app.include_router(bank_router)
+app.include_router(payouts_router)
 
 app.add_middleware(
     CORSMiddleware,

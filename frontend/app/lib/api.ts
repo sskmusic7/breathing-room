@@ -126,7 +126,7 @@ export interface BankStatus {
   collector: string | null;
   bank_connected: boolean;
   mandate_status: string | null;
-  plan: { pot_address: string; surplus_gbp: number } | null;
+  plan: { pot_address: string; surplus_gbp: number; creditors?: CreditorPayee[] } | null;
   collecting: boolean;
   events: { at: string; text: string }[];
 }
@@ -160,7 +160,20 @@ export const startBankMandate = (body: {
 }) =>
   bankFetch<{ url: string }>("/mandate", { method: "POST", body: JSON.stringify(body) });
 
-export const saveBankPlan = (body: { wallet: string; pot_address: string; surplus_gbp: number }) =>
+// Where a creditor's share is paid in GBP, and the reference they match it by.
+export interface CreditorPayee {
+  label: string;
+  sort_code: string;
+  account_no: string;
+  reference: string;
+}
+
+export const saveBankPlan = (body: {
+  wallet: string;
+  pot_address: string;
+  surplus_gbp: number;
+  creditors?: CreditorPayee[];
+}) =>
   bankFetch<{ ok: boolean }>("/plan", { method: "POST", body: JSON.stringify(body) });
 
 export const checkPaydayNow = (wallet: string) =>

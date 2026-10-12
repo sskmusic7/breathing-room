@@ -73,16 +73,31 @@ def mandate(req: MandateRequest) -> dict:
     return {"url": url}
 
 
+class CreditorPayee(BaseModel):
+    label: str
+    sort_code: str = ""
+    account_no: str = ""
+    reference: str = ""
+
+
 class PlanRequest(BaseModel):
     wallet: str
     pot_address: str
     surplus_gbp: float = Field(gt=0)
+    creditors: list[CreditorPayee] = []
 
 
 @router.post("/plan")
 def plan(req: PlanRequest) -> dict:
     wallet = _wallet(req.wallet)
-    store.update(wallet, plan={"pot_address": req.pot_address, "surplus_gbp": req.surplus_gbp})
+    store.update(
+        wallet,
+        plan={
+            "pot_address": req.pot_address,
+            "surplus_gbp": req.surplus_gbp,
+            "creditors": [c.model_dump() for c in req.creditors],
+        },
+    )
     return {"ok": True}
 
 

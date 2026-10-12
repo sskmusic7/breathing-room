@@ -20,6 +20,9 @@ interface SweepCreditorRow {
   proRataShareBps: number;
   priorityFixedAmountGbp: string;
   isPriority: boolean;
+  sortCode: string;
+  accountNo: string;
+  reference: string;
 }
 
 type TxState = { status: "idle" | "pending" | "success" | "error"; hash?: string; error?: string };
@@ -154,6 +157,21 @@ export default function SweepPage() {
     })();
   }, [potAddress, sendTransaction]);
 
+  function updateCreditor(id: string, patch: Partial<SweepCreditorRow>) {
+    setCreditors((rows) => rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  }
+
+  const payees = useMemo(
+    () =>
+      creditors.map((c) => ({
+        label: c.label,
+        sort_code: c.sortCode,
+        account_no: c.accountNo,
+        reference: c.reference,
+      })),
+    [creditors]
+  );
+
   // Prefill the creditor table from whatever the SFS screen last calculated.
   useEffect(() => {
     const raw = sessionStorage.getItem(SFS_RESULT_STORAGE_KEY);
@@ -169,6 +187,9 @@ export default function SweepPage() {
         proRataShareBps: a.category === "priority" ? 0 : a.pro_rata_share_bps,
         priorityFixedAmountGbp: a.category === "priority" ? a.pragmatic_offer : "0",
         isPriority: a.category === "priority",
+        sortCode: "",
+        accountNo: "",
+        reference: "",
       }))
     );
   }, []);
@@ -283,6 +304,7 @@ export default function SweepPage() {
               potAddress={potAddress}
               surplusGbp={surplusGbp}
               defaultEmail={user.email?.address}
+              payees={payees}
             />
 
             <ActionCard
@@ -302,11 +324,37 @@ export default function SweepPage() {
               ) : (
                 <div className="space-y-2">
                   {creditors.map((c) => (
-                    <div key={c.id} className="flex justify-between text-sm">
-                      <span className="truncate">{c.label}</span>
-                      <span>£{c.debtBalanceGbp} owed</span>
+                    <div key={c.id} className="text-sm border-b border-slate-100 dark:border-slate-700 pb-2">
+                      <div className="flex justify-between">
+                        <span className="truncate font-medium">{c.label}</span>
+                        <span>£{c.debtBalanceGbp} owed</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 mt-1">
+                        <input
+                          placeholder="Their sort code"
+                          value={c.sortCode}
+                          onChange={(e) => updateCreditor(c.id, { sortCode: e.target.value })}
+                          className="rounded border border-slate-300 dark:border-slate-600 bg-transparent px-2 py-1 text-xs"
+                        />
+                        <input
+                          placeholder="Their account no."
+                          value={c.accountNo}
+                          onChange={(e) => updateCreditor(c.id, { accountNo: e.target.value })}
+                          className="rounded border border-slate-300 dark:border-slate-600 bg-transparent px-2 py-1 text-xs"
+                        />
+                        <input
+                          placeholder="Your reference (PCN / account no.)"
+                          value={c.reference}
+                          onChange={(e) => updateCreditor(c.id, { reference: e.target.value })}
+                          className="rounded border border-slate-300 dark:border-slate-600 bg-transparent px-2 py-1 text-xs"
+                        />
+                      </div>
                     </div>
                   ))}
+                  <p className="text-xs text-slate-400">
+                    Find these on the creditor&apos;s letter under &quot;how to pay&quot;. Each payment is sent by bank transfer
+                    with your reference, so they can match it.
+                  </p>
                   <button
                     onClick={onSetCreditors}
                     disabled={creditorsTx.status === "pending"}

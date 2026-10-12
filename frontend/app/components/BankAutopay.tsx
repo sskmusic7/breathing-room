@@ -8,6 +8,7 @@ import {
   saveBankPlan,
   startBankMandate,
   type BankStatus,
+  type CreditorPayee,
 } from "../lib/api";
 
 // Connect bank (read-only) -> approve automatic payday collection (VRP
@@ -17,11 +18,13 @@ export default function BankAutopay({
   potAddress,
   surplusGbp,
   defaultEmail,
+  payees,
 }: {
   wallet: string;
   potAddress: string;
   surplusGbp: number | null;
   defaultEmail?: string;
+  payees: CreditorPayee[];
 }) {
   const [status, setStatus] = useState<BankStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -44,12 +47,22 @@ export default function BankAutopay({
     return () => clearInterval(id);
   }, [refresh]);
 
-  // Keep the backend's plan in step with the pot and the latest SFS surplus.
+  // Keep the backend's plan in step with the pot, the latest SFS surplus and
+  // where each creditor is paid (debounced while bank details are typed).
   useEffect(() => {
     if (!status?.bank_connected || !surplusGbp) return;
-    if (status.plan?.pot_address === potAddress && status.plan?.surplus_gbp === surplusGbp) return;
-    saveBankPlan({ wallet, pot_address: potAddress, surplus_gbp: surplusGbp }).then(refresh).catch(() => {});
-  }, [status, wallet, potAddress, surplusGbp, refresh]);
+    const same =
+      status.plan?.pot_address === potAddress &&
+      status.plan?.surplus_gbp === surplusGbp &&
+      JSON.stringify(status.plan?.creditors ?? []) === JSON.stringify(payees);
+    if (same) return;
+    const id = setTimeout(() => {
+      saveBankPlan({ wallet, pot_address: potAddress, surplus_gbp: surplusGbp, creditors: payees })
+        .then(refresh)
+        .catch(() => {});
+    }, 800);
+    return () => clearTimeout(id);
+  }, [status, wallet, potAddress, surplusGbp, payees, refresh]);
 
   async function onApprove() {
     if (!surplusGbp) return;

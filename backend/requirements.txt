@@ -99,3 +99,4 @@ websockets==16.1.1
 yarl==1.25.1
 cryptography==48.0.1
 eth-account==0.14.0
+eth_abi==6.0.0
