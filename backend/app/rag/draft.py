@@ -196,7 +196,7 @@ def draft_representation_letter(facts: NoticeFacts) -> dict:
 
     from openai import OpenAI  # imported lazily so the package is optional at import time
 
-    client = OpenAI(api_key=api_key, base_url=MOONSHOT_BASE_URL, timeout=60, max_retries=1)
+    client = OpenAI(api_key=api_key, base_url=MOONSHOT_BASE_URL, timeout=150, max_retries=0)
 
     context_block = "\n\n".join(
         f"### {d.metadata.get('title')} ({d.metadata.get('citation')})\n{d.text}" for d in context
@@ -244,7 +244,11 @@ Draft the formal representation letter now."""
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            temperature=0.3,
+            # kimi-k2.6 only accepts its default temperature (1); sending
+            # anything else returns a 400 and silently fell back to the template.
+            # It reasons before answering (~30-60s), and reasoning tokens count
+            # against max_tokens, so leave plenty of room for the letter itself.
+            max_tokens=6000,
         )
         letter = response.choices[0].message.content
     except Exception:  # out of credit, rate-limited, or down: the user still gets a letter

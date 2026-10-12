@@ -30,7 +30,8 @@ interface SweepCreditorRow {
 
 type TxState = { status: "idle" | "pending" | "success" | "error"; hash?: string; error?: string };
 
-const potStorageKey = (wallet: string) => `breathing-room:pot:${wallet.toLowerCase()}`;
+// v2 = pausable pot; older saved pots predate the pause switch and are replaced.
+const potStorageKey = (wallet: string) => `breathing-room:pot:v2:${wallet.toLowerCase()}`;
 
 function weiToGbp(wei: string | null): string {
   return (parseFloat(wei || "0") / GBP_TO_MON_RATE).toLocaleString("en-GB", {
@@ -60,6 +61,8 @@ export default function SweepPage() {
   const [surplusGbp, setSurplusGbp] = useState<number | null>(null);
 
   const [potAddress, setPotAddress] = useState<`0x${string}` | null>(null);
+  const [planPaused, setPlanPaused] = useState(false);
+  const [pauseTx, setPauseTx] = useState<TxState>({ status: "idle" });
   const [setupError, setSetupError] = useState<string | null>(null);
 
   const [forwardTx, setForwardTx] = useState<TxState>({ status: "idle" });
@@ -143,6 +146,28 @@ export default function SweepPage() {
       cancelled = true;
     };
   }, [walletAddress, potAddress, sendTransaction, fetchBalance]);
+
+  // Debtor-controlled emergency brake (mentor licensing guidance: the user can
+  // pause, change or cancel the plan before anything pays out).
+  useEffect(() => {
+    if (!potAddress) return;
+    (publicClient.readContract({ address: potAddress, abi: DEBT_POTS_ABI, functionName: "paused" }) as Promise<boolean>)
+      .then(setPlanPaused)
+      .catch(() => {});
+  }, [potAddress]);
+
+  async function onTogglePause() {
+    if (!potAddress) return;
+    setPauseTx({ status: "pending" });
+    try {
+      const data = encodeFunctionData({ abi: DEBT_POTS_ABI, functionName: "setPaused", args: [!planPaused] });
+      const result = await sendTransaction({ to: potAddress, data, value: 0 });
+      setPlanPaused(!planPaused);
+      setPauseTx({ status: "success", hash: result.hash });
+    } catch (err) {
+      setPauseTx({ status: "error", error: err instanceof Error ? err.message : String(err) });
+    }
+  }
 
   // With bank collection only the surplus enters the pot (essentials never
   // leave the bank), so the pot itself must not hold anything back.
@@ -315,6 +340,25 @@ export default function SweepPage() {
               defaultEmail={user.email?.address}
               payees={payees}
             />
+
+            <ActionCard
+              step={0}
+              title={planPaused ? "Payouts are paused" : "Pause payouts"}
+              description={
+                planPaused
+                  ? "Nothing will be paid to creditors until you resume. Your money stays in your pot and you can withdraw it."
+                  : "Need a breather this month? Pause and nothing is paid out until you resume. Only you can do this."
+              }
+              tx={pauseTx}
+            >
+              <button
+                onClick={onTogglePause}
+                disabled={pauseTx.status === "pending"}
+                className="rounded bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 px-4 py-2 font-semibold disabled:opacity-50"
+              >
+                {pauseTx.status === "pending" ? "Saving…" : planPaused ? "Resume payouts" : "Pause this month"}
+              </button>
+            </ActionCard>
 
             <ActionCard
               step={1}
@@ -498,7 +542,7 @@ function ActionCard({
   return (
     <section className="bg-white dark:bg-slate-800 rounded-lg p-4 mb-4 shadow-sm">
       <h2 className="font-semibold text-slate-700 dark:text-slate-200">
-        {step}. {title}
+        {step > 0 ? `${step}. ` : ""}{title}
       </h2>
       <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{description}</p>
       {children}

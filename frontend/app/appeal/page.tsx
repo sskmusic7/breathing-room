@@ -235,6 +235,11 @@ export default function AppealPage() {
           >
             {loading ? "Drafting…" : "Draft my representation"}
           </button>
+          {loading && (
+            <p className="text-xs text-slate-500 text-center">
+              Writing your letter against the relevant law. This can take up to 2 minutes.
+            </p>
+          )}
         </form>
 
         {result && (

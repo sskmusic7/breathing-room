@@ -72,3 +72,12 @@ Old session log: ~/.claude/projects/-Users-sskmusic/1e858211-4ab0-4288-881c-08db
 - Revolut requires a postal address for UK business payees: collected on the confirm-creditors step
 - Worker turns each on-chain CreditorPaid (to SETTLEMENT_ADDRESS = demo faucet) into one Revolut transfer; tx hash + log index = request_id (idempotent)
 - KIMI: key on droplet, model kimi-k2.6, account needs a top-up (insufficient balance); appeals fall back to the template until then
+
+## Pausable pot redeploy (2026-10-12, 22:10)
+- Mentor (EU/UK payments licences) advised the user must be able to pause/change/cancel before payout. DebtPots now has debtor-only setPaused(bool); sweep reverts while paused; automation reports nothing due
+- NEW main pot: 0x26618B97016Db6d384A11c4B5800D58d2c3cE2F6 (owner Kayah's Privy wallet 0x6109…2932, allowance 0/0 for bank mode)
+- NEW automation: 0x1fA32e793a687Be43D16F15149720bDbd67b1b3f, allowlisted on the receiver; CRE config targetAddress updated (repo + droplet)
+- Old pot 0x40f9…c111 / automation 0x53Ca…62c7 retired (empty)
+- Testers get a fresh pausable pot automatically (localStorage key bumped to v2)
+- Kayah must re-run "Confirm creditors" on the new pot in the app before the demo
+- KIMI live: kimi-k2.6 needs temperature omitted (only 1 allowed), ~100s per letter (reasoning), backend timeout 150s, nginx 200s
