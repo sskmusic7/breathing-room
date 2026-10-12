@@ -121,8 +121,9 @@ def gbp_account_id() -> str:
     return best["id"]
 
 
-def counterparty_id(name: str, sort_code: str, account_no: str) -> str:
-    """Creates (once) and caches a UK GBP business counterparty."""
+def counterparty_id(name: str, sort_code: str, account_no: str, address: str = "", city: str = "", postcode: str = "") -> str:
+    """Creates (once) and caches a UK GBP business counterparty. Revolut
+    requires a postal address for UK business payees (from the creditor's letter)."""
     key = f"{sort_code}:{account_no}"
     cache = _state().get("counterparties", {})
     if key in cache:
@@ -137,6 +138,12 @@ def counterparty_id(name: str, sort_code: str, account_no: str) -> str:
             "currency": "GBP",
             "sort_code": sort_code.replace("-", ""),
             "account_no": account_no,
+            "address": {
+                "street_line1": address or name,
+                "city": city or "London",
+                "country": "GB",
+                "postcode": postcode,
+            },
         },
     )
     _save_state(counterparties={**cache, key: created["id"]})

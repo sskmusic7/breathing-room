@@ -23,6 +23,9 @@ interface SweepCreditorRow {
   sortCode: string;
   accountNo: string;
   reference: string;
+  address: string;
+  city: string;
+  postcode: string;
 }
 
 type TxState = { status: "idle" | "pending" | "success" | "error"; hash?: string; error?: string };
@@ -168,6 +171,9 @@ export default function SweepPage() {
         sort_code: c.sortCode,
         account_no: c.accountNo,
         reference: c.reference,
+        address: c.address,
+        city: c.city,
+        postcode: c.postcode,
       })),
     [creditors]
   );
@@ -190,6 +196,9 @@ export default function SweepPage() {
         sortCode: "",
         accountNo: "",
         reference: "",
+        address: "",
+        city: "",
+        postcode: "",
       }))
     );
   }, []);
@@ -346,6 +355,24 @@ export default function SweepPage() {
                           placeholder="Your reference (PCN / account no.)"
                           value={c.reference}
                           onChange={(e) => updateCreditor(c.id, { reference: e.target.value })}
+                          className="rounded border border-slate-300 dark:border-slate-600 bg-transparent px-2 py-1 text-xs"
+                        />
+                        <input
+                          placeholder="Their address"
+                          value={c.address}
+                          onChange={(e) => updateCreditor(c.id, { address: e.target.value })}
+                          className="rounded border border-slate-300 dark:border-slate-600 bg-transparent px-2 py-1 text-xs"
+                        />
+                        <input
+                          placeholder="Town / city"
+                          value={c.city}
+                          onChange={(e) => updateCreditor(c.id, { city: e.target.value })}
+                          className="rounded border border-slate-300 dark:border-slate-600 bg-transparent px-2 py-1 text-xs"
+                        />
+                        <input
+                          placeholder="Postcode"
+                          value={c.postcode}
+                          onChange={(e) => updateCreditor(c.id, { postcode: e.target.value })}
                           className="rounded border border-slate-300 dark:border-slate-600 bg-transparent px-2 py-1 text-xs"
                         />
                       </div>

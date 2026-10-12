@@ -34,7 +34,7 @@ def plan(tmp_path, monkeypatch):
         },
     )
     paid = []
-    monkeypatch.setattr(worker.revolut, "counterparty_id", lambda name, sc, acc: f"cp-{acc}")
+    monkeypatch.setattr(worker.revolut, "counterparty_id", lambda name, sc, acc, *address: f"cp-{acc}")
     monkeypatch.setattr(worker.revolut, "pay", lambda cp, amount, ref, request_id: paid.append((cp, round(amount, 2), ref, request_id)))
     return paid
 

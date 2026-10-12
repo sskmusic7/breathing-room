@@ -73,7 +73,14 @@ def pay_out_wallet(wallet: str, head: int) -> None:
             creditor = creditors.get(event["label"])
             if event["key"] in paid or not creditor or event["wallet"].lower() != _settlement_address():
                 continue
-            counterparty = revolut.counterparty_id(creditor["label"], creditor["sort_code"], creditor["account_no"])
+            counterparty = revolut.counterparty_id(
+                creditor["label"],
+                creditor["sort_code"],
+                creditor["account_no"],
+                creditor.get("address", ""),
+                creditor.get("city", ""),
+                creditor.get("postcode", ""),
+            )
             reference = creditor.get("reference") or "Breathing Room payment"
             revolut.pay(counterparty, event["amount_gbp"], reference, request_id=event["key"].replace("0x", "")[:40])
             paid.add(event["key"])

@@ -166,6 +166,9 @@ export interface CreditorPayee {
   sort_code: string;
   account_no: string;
   reference: string;
+  address: string;
+  city: string;
+  postcode: string;
 }
 
 export const saveBankPlan = (body: {

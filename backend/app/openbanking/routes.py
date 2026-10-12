@@ -78,6 +78,9 @@ class CreditorPayee(BaseModel):
     sort_code: str = ""
     account_no: str = ""
     reference: str = ""
+    address: str = ""
+    city: str = ""
+    postcode: str = ""
 
 
 class PlanRequest(BaseModel):
