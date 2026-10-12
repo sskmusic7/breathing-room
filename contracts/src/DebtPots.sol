@@ -56,6 +56,14 @@ contract DebtPots is Ownable, ReentrancyGuard {
     error InsufficientForAllowance(uint256 balance, uint256 required);
     error BpsOverflow(uint256 totalBps);
     error EmptyCreditorSet();
+    error PlanPaused();
+
+    /// @notice Debtor-controlled emergency brake: while paused, no payout runs.
+    /// The debtor keeps full control (pause, change creditors, withdraw) before
+    /// anything executes, and creditors have no admin power over the pot.
+    bool public paused;
+
+    event PausedSet(bool paused);
 
     constructor(address debtor, uint256 _livingExpensesAllowanceWei, uint256 _savingsBufferWei)
         Ownable(debtor)
@@ -96,6 +104,12 @@ contract DebtPots is Ownable, ReentrancyGuard {
         emit CreditorsUpdated(_creditors.length, nonPriorityBps);
     }
 
+    /// @notice Pause or resume the payout plan. Only the debtor can do this.
+    function setPaused(bool _paused) external onlyOwner {
+        paused = _paused;
+        emit PausedSet(_paused);
+    }
+
     function creditorCount() external view returns (uint256) {
         return creditors.length;
     }
@@ -117,6 +131,7 @@ contract DebtPots is Ownable, ReentrancyGuard {
     /// backend the moment it detects a payday deposit, or by the debtor's wallet
     /// directly.
     function sweep() external nonReentrant {
+        if (paused) revert PlanPaused();
         uint256 totalIn = address(this).balance;
         uint256 reserved = livingExpensesAllowanceWei + savingsBufferWei;
 

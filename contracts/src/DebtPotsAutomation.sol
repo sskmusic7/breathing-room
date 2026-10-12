@@ -41,7 +41,7 @@ contract DebtPotsAutomation is AutomationCompatibleInterface {
         uint256 balance = address(pots).balance;
         uint256 reserved = pots.livingExpensesAllowanceWei() + pots.savingsBufferWei();
 
-        upkeepNeeded = balance >= reserved && balance > 0 && pots.creditorCount() > 0;
+        upkeepNeeded = !pots.paused() && balance >= reserved && balance > 0 && pots.creditorCount() > 0;
         performData = abi.encode(balance);
     }
 
@@ -56,6 +56,7 @@ contract DebtPotsAutomation is AutomationCompatibleInterface {
 
         require(balance >= reserved && balance > 0, "nothing to sweep");
         require(pots.creditorCount() > 0, "no creditors configured");
+        require(!pots.paused(), "plan paused");
 
         pots.sweep();
         emit UpkeepPerformed(balance);

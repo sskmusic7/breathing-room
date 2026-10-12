@@ -108,4 +108,34 @@ contract DebtPotsAutomationTest is Test {
         assertEq(address(pots).balance, 0);
         assertEq(creditor.balance, 1 ether - LIVING - SAVINGS, "must sweep real balance, not the forged value");
     }
+
+    function test_pause_blocksUpkeepAndSweep_untilResumed() public {
+        _setOneCreditor();
+        vm.deal(address(pots), LIVING + SAVINGS + 1 ether);
+        (bool due, ) = automation.checkUpkeep("");
+        assertTrue(due, "funded pot with creditors is due");
+
+        vm.prank(debtor);
+        pots.setPaused(true);
+        (due, ) = automation.checkUpkeep("");
+        assertFalse(due, "paused plan never reports upkeep");
+        vm.expectRevert(bytes("plan paused"));
+        automation.performUpkeep("");
+        vm.expectRevert(DebtPots.PlanPaused.selector);
+        pots.sweep();
+
+        vm.prank(debtor);
+        pots.setPaused(false);
+        (due, ) = automation.checkUpkeep("");
+        assertTrue(due, "resumed plan is due again");
+        automation.performUpkeep("");
+        assertEq(address(pots).balance, 0, "swept after resume");
+    }
+
+    function test_onlyDebtorCanPause() public {
+        vm.prank(creditor);
+        vm.expectRevert();
+        pots.setPaused(true);
+        assertFalse(pots.paused(), "creditor has no admin power over the pot");
+    }
 }
