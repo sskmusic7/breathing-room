@@ -16,7 +16,9 @@ from eth_abi import decode
 from app.openbanking import onramp, store
 from . import revolut
 
-MONAD_RPC = os.environ.get("MONAD_RPC_URL", "https://testnet-rpc.monad.xyz")
+# Log scans stay on the public RPC: Alchemy's free tier caps eth_getLogs at 10
+# blocks, ours scans 100 at a time. Transactions and reads use Alchemy (MONAD_RPC_URL).
+MONAD_RPC = os.environ.get("MONAD_LOGS_RPC_URL", "https://testnet-rpc.monad.xyz")
 # keccak256("CreditorPaid(address,string,uint256,bool)")
 CREDITOR_PAID_TOPIC = "0x6753e6016ce2ff370380bfe43a8f540e09922470c85350aa290e7a4d206d115d"
 CHUNK = 100  # Monad public RPC caps eth_getLogs at 100 blocks
