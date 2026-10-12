@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from .query import RetrievedDoc, query_legal_corpus
 
 MOONSHOT_BASE_URL = "https://api.moonshot.ai/v1"
-MOONSHOT_MODEL = os.environ.get("MOONSHOT_MODEL", "kimi-k2-0711-preview")
+MOONSHOT_MODEL = os.environ.get("MOONSHOT_MODEL", "kimi-k2.6")
 
 
 @dataclass
@@ -184,16 +184,19 @@ def draft_representation_letter(facts: NoticeFacts) -> dict:
     context = _retrieve_context(facts)
     api_key = os.environ.get("MOONSHOT_API_KEY")
 
-    if not api_key:
-        return {
-            "letter": _template_fallback(facts, context),
-            "citations": [d.metadata for d in context],
-            "used_llm": False,
-        }
+    template = {
+        "letter": _template_fallback(facts, context),
+        "citations": [d.metadata for d in context],
+        "used_llm": False,
+    }
+    # Bailiff and court letters go to a person, never to a model.
+    handoff = facts.issuer_type in HANDOFF_ISSUERS or facts.stage_of_notice in HANDOFF_STAGES
+    if not api_key or handoff:
+        return template
 
     from openai import OpenAI  # imported lazily so the package is optional at import time
 
-    client = OpenAI(api_key=api_key, base_url=MOONSHOT_BASE_URL)
+    client = OpenAI(api_key=api_key, base_url=MOONSHOT_BASE_URL, timeout=60, max_retries=1)
 
     context_block = "\n\n".join(
         f"### {d.metadata.get('title')} ({d.metadata.get('citation')})\n{d.text}" for d in context
@@ -234,16 +237,20 @@ Mitigating circumstances reported by the user (only mention what's relevant, don
 
 Draft the formal representation letter now."""
 
-    response = client.chat.completions.create(
-        model=MOONSHOT_MODEL,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        temperature=0.3,
-    )
-
-    letter = response.choices[0].message.content
+    try:
+        response = client.chat.completions.create(
+            model=MOONSHOT_MODEL,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.3,
+        )
+        letter = response.choices[0].message.content
+    except Exception:  # out of credit, rate-limited, or down: the user still gets a letter
+        return template
+    if not letter:
+        return template
 
     return {
         "letter": letter,
