@@ -65,3 +65,10 @@ Old session log: ~/.claude/projects/-Users-sskmusic/1e858211-4ab0-4288-881c-08db
 - CRE CLI v1.38.0 at /root/.cre/bin/cre, logged in by copying ~/.cre/cre.yaml + context.yaml from the Mac. If the login expires there, re-run `cre login` on the Mac and re-copy those two files
 - The Mac loop (run-sweep-check.sh --loop) is no longer needed
 - When deploy access lands: deploy to the Chainlink network, switch the receiver back to the production forwarder + real owner, then `rm /etc/cron.d/breathing-room-cre`
+
+## GBP creditor payouts via Revolut (2026-10-12), LIVE in sandbox
+- Revolut Business sandbox, Client ID p3wwcmZt…, cert backend/secrets/revolut_public.cer (private key gitignored, mounted on droplet), refresh token in /srv/breathing-room-backend/state/revolut.json
+- First payout: £12.40 to "Lambeth Council" (04-00-04 / 12345678), ref PCN LB123456, tx 0568dfbf-… (pending is normal in sandbox)
+- Revolut requires a postal address for UK business payees: collected on the confirm-creditors step
+- Worker turns each on-chain CreditorPaid (to SETTLEMENT_ADDRESS = demo faucet) into one Revolut transfer; tx hash + log index = request_id (idempotent)
+- KIMI: key on droplet, model kimi-k2.6, account needs a top-up (insufficient balance); appeals fall back to the template until then
