@@ -57,7 +57,7 @@ export function HelpPill({ label = "Help" }: { label?: string }) {
       <Sheet open={open} onClose={() => setOpen(false)} title="Talk to a real person">
         <p className="text-sm leading-[1.45] text-muted">
           These services are free, confidential and independent. They can talk you through your options and, if you
-          need it, set up Breathing Space to pause interest and collections.
+          need it, set up the government&apos;s Breathing Space scheme to pause interest and collections.
         </p>
         <a href="tel:08088084000" className="btn">
           Call National Debtline
@@ -67,6 +67,19 @@ export function HelpPill({ label = "Help" }: { label?: string }) {
         <a href="https://www.citizensadvice.org.uk/debt-and-money/" target="_blank" rel="noopener noreferrer" className="btn-ghost">
           Citizens Advice
         </a>
+        <a href="https://www.stepchange.org/" target="_blank" rel="noopener noreferrer" className="btn-ghost">
+          StepChange Debt Charity
+        </a>
+        <p className="text-[13px] leading-[1.45] text-muted">
+          Feeling overwhelmed? Samaritans are there day or night on{" "}
+          <a href="tel:116123" className="font-semibold text-ink underline underline-offset-[3px]">
+            116 123
+          </a>{" "}
+          (free). If you&apos;re in danger, call 999.
+        </p>
+        <Link href="/terms" className="btn-link" onClick={() => setOpen(false)}>
+          Key Facts, terms, privacy and complaints
+        </Link>
       </Sheet>
     </>
   );
@@ -147,5 +160,17 @@ export function KettleIllustration({ animated = false }: { animated?: boolean })
       <path d="M234 56c8 0 8 12 0 12" stroke="#1B6440" strokeWidth="2" fill="none" />
       <path d="M70 76h180" stroke="#E5DCCB" strokeWidth="2" strokeLinecap="round" />
     </svg>
+  );
+}
+
+/** Persistent prototype warning (GRC pack Part 2 step 1, Terms clause 4). */
+export function DemoBanner() {
+  return (
+    <div className="bg-ink text-white text-[12px] leading-[1.35] text-center px-4 py-1.5">
+      Prototype · demo money only, no real payments ·{" "}
+      <Link href="/terms#prototype" className="underline underline-offset-2">
+        don&apos;t enter real details
+      </Link>
+    </div>
   );
 }

@@ -125,11 +125,22 @@ export default function SweepPage() {
           if (!cancelled) setPotAddress(saved);
           return;
         }
-        await fetch("/api/demo-top-up", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ address: walletAddress }),
-        });
+        // Make sure the demo gas money has actually arrived before deploying;
+        // an empty wallet makes Privy show its own funding screen instead.
+        const NEEDED = parseEther("0.21");
+        if ((await publicClient.getBalance({ address: walletAddress })) < NEEDED) {
+          await fetch("/api/demo-top-up", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ address: walletAddress }),
+          }).catch(() => {});
+          let funded = false;
+          for (let i = 0; i < 20 && !funded; i++) {
+            await new Promise((r) => setTimeout(r, 2000));
+            funded = (await publicClient.getBalance({ address: walletAddress })) >= NEEDED;
+          }
+          if (!funded) throw new Error("We couldn't get your account ready just now. Please wait a minute and try again.");
+        }
         const constructorArgs = encodeAbiParameters(
           [{ type: "address" }, { type: "uint256" }, { type: "uint256" }],
           [walletAddress, BigInt(0), BigInt(0)]
@@ -202,6 +213,13 @@ export default function SweepPage() {
       await sendTransaction({ to: potAddress, data, value: 0 }).catch(() => {});
     })();
   }, [potAddress, sendTransaction]);
+
+  // What each creditor gets from one payday's collection (priority first, then pro-rata).
+  function creditorAmount(c: SweepCreditorRow): number {
+    if (c.isPriority) return Number(c.priorityFixedAmountGbp) || 0;
+    const priorityTotal = creditors.filter((x) => x.isPriority).reduce((sum, x) => sum + (Number(x.priorityFixedAmountGbp) || 0), 0);
+    return Math.max((surplusGbp ?? 0) - priorityTotal, 0) * (c.proRataShareBps / 10000);
+  }
 
   function updateCreditor(id: string, patch: Partial<SweepCreditorRow>) {
     setCreditors((rows) => rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
@@ -431,14 +449,25 @@ export default function SweepPage() {
               ) : (
                 <>
                   <p className="text-[13px] leading-[1.45] text-muted">
+                    Check this before you confirm: each payday we collect {gbp(surplusGbp ?? 0, 2)}, priority debts are paid first,
+                    and the rest is shared by what you owe. Payments go out a few minutes after your payday lands.
+                  </p>
+                  <p className="text-[13px] leading-[1.45] text-muted">
                     Find these on each letter under &quot;how to pay&quot;. Every payment goes by bank transfer with your
                     reference, so they can match it.
                   </p>
                   {creditors.map((c) => (
                     <div key={c.id} className="flex flex-col gap-2 border-t border-line pt-3">
                       <div className="row">
-                        <span className="font-semibold !text-ink truncate">{c.label}</span>
+                        <span className="font-semibold !text-ink truncate">
+                          {c.label}
+                          {c.isPriority && <span className="ml-1.5 text-[11px] font-bold bg-butter text-ink px-1.5 py-0.5 rounded-[5px]">priority</span>}
+                        </span>
                         <span>{gbp(c.debtBalanceGbp)} owed</span>
+                      </div>
+                      <div className="row text-[13px] -mt-1">
+                        <span>Gets each payday</span>
+                        <span className="font-bold">{gbp(creditorAmount(c), 2)}</span>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <input placeholder="Their sort code" value={c.sortCode} inputMode="numeric" onChange={(e) => updateCreditor(c.id, { sortCode: e.target.value })} className="input" />
@@ -468,6 +497,11 @@ export default function SweepPage() {
             <button onClick={onTogglePause} disabled={pauseTx.status === "pending"} className="btn-ghost">
               {pauseTx.status === "pending" ? "Saving…" : planPaused ? "Resume payouts" : "Pause this month"}
             </button>
+            <p className="text-center text-[12px] text-muted">
+              {planPaused
+                ? "Paused: nothing goes to creditors until you resume. Only you can do this."
+                : "Pausing stops payouts from your pot. A bank payment already on its way may still arrive."}
+            </p>
             {pauseTx.status === "error" && <p className="error">{pauseTx.error}</p>}
             <DemoTag />
           </div>

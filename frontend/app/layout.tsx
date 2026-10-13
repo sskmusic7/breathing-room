@@ -3,6 +3,7 @@ import { Figtree, Young_Serif } from "next/font/google";
 import "./globals.css";
 import PrivyProvider from "./components/privy-provider";
 import BottomNav from "./components/BottomNav";
+import { DemoBanner } from "./components/ui";
 
 const figtree = Figtree({ subsets: ["latin"], variable: "--font-figtree" });
 const youngSerif = Young_Serif({ subsets: ["latin"], weight: "400", variable: "--font-young-serif" });
@@ -66,6 +67,7 @@ export default function RootLayout({
         className={`${figtree.variable} ${youngSerif.variable}`}
       >
         <PrivyProvider>
+          <DemoBanner />
           {children}
           <BottomNav />
         </PrivyProvider>

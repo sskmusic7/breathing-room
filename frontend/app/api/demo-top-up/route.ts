@@ -7,6 +7,8 @@ import { monadTestnet } from "viem/chains";
 // (their own DebtPots deploy + a few transactions). Only tops up wallets that
 // are nearly empty, so repeat calls don't drain the faucet.
 const TOP_UP = parseEther("0.3");
+// Waiting for the receipt can outlast the default function timeout.
+export const maxDuration = 30;
 const ONLY_BELOW = parseEther("0.25");
 
 export const POST = async (req: NextRequest) => {

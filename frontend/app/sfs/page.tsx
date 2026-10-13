@@ -192,7 +192,7 @@ export default function SfsPage() {
         <h1 className="h2 text-[24px]">Right now, there isn&apos;t money left over</h1>
         <p className="text-[15px] leading-[1.45] text-muted">
           <b className="text-ink">That&apos;s not your fault</b>, and it doesn&apos;t mean you&apos;re stuck. Free advisers can
-          pause interest and collections, often through the Breathing Space scheme.
+          pause interest and collections, often through the government&apos;s Breathing Space scheme.
         </p>
         <div className="card flex flex-col gap-2">
           <h2 className="font-semibold text-[15px]">What we can do now</h2>
@@ -222,7 +222,7 @@ export default function SfsPage() {
             rel="noopener noreferrer"
             className="btn-ghost"
           >
-            What is Breathing Space?
+            What is the Breathing Space scheme?
           </a>
           <button type="button" className="btn-link" onClick={() => setResult(null)}>
             Change my numbers
@@ -271,6 +271,19 @@ export default function SfsPage() {
             can confirm this with your creditors.
           </p>
         )}
+        <details className="text-[13px] leading-[1.45] text-muted">
+          <summary className="cursor-pointer font-semibold text-ink">Good to know before you start</summary>
+          <ul className="list-disc pl-4 mt-1 flex flex-col gap-1">
+            <li>You stay responsible for your debts. A plan doesn&apos;t stop interest or action unless a creditor agrees.</li>
+            <li>Creditors may not accept reduced payments, and paying less than agreed may show on your credit file.</li>
+            <li>If your income or costs change, update your numbers and we&apos;ll redo the plan. You can pause any time.</li>
+            <li>Free advice is always available from National Debtline, StepChange and Citizens Advice.</li>
+          </ul>
+        </details>
+        <p className="text-[12px] text-muted">
+          Free to you. Creditors fund Breathing Room with 5% of what they receive (&quot;Fair Share&quot;); it never reduces what
+          goes to your debt, and it never changes your split.
+        </p>
         <div className="mt-auto flex flex-col gap-2">
           <Link href="/sweep" className="btn">
             Make it automatic

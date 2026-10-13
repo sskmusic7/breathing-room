@@ -15,7 +15,7 @@ import {
   type MitigatingCircumstances,
   type StageOfNotice,
 } from "../lib/api";
-import { KettleIllustration, TopBar } from "../components/ui";
+import { KettleIllustration, Sheet, TopBar } from "../components/ui";
 
 const PENDING_LETTER_KEY = "breathing-room:pending-letter";
 
@@ -483,7 +483,21 @@ export default function AppealPage() {
           <div className="bg-white border border-line rounded-[10px] p-4 font-[Georgia,serif] text-[13.5px] leading-[1.6] text-[#222] whitespace-pre-wrap max-h-[52vh] overflow-auto">
             {result.letter.replace(/\*\*/g, "")}
           </div>
-          <p className="text-xs leading-[1.45] text-muted">Draft only, not legal advice. You check it, sign it and send it.</p>
+          {result.citations.length > 0 && (
+            <details className="text-[13px] leading-[1.45]">
+              <summary className="cursor-pointer font-semibold">Laws this letter relies on</summary>
+              <ul className="list-disc pl-5 mt-1 text-muted">
+                {result.citations.map((c, i) => (
+                  <li key={i}>{String(c.title ?? c.citation ?? "UK law")}{c.citation && c.title ? ` (${String(c.citation)})` : ""}</li>
+                ))}
+              </ul>
+            </details>
+          )}
+          <p className="text-xs leading-[1.45] text-muted">
+            Draft only, not legal advice. It was prepared by our letter tool (which uses AI) from UK law, and may contain mistakes:
+            check every fact, then sign and send it yourself. Check the deadline on your letter and send it in time; discounts
+            often end after 14 days. Unsure? National Debtline (0808 808 4000) will check it for free.
+          </p>
           <button
             type="button"
             className="btn"
@@ -580,10 +594,37 @@ function OwnWords({ value, onChange }: { value: string; onChange: (v: string) =>
     rec.start();
   }
 
+  const [examples, setExamples] = useState(false);
   return (
     <div className="flex flex-col gap-1.5">
+      <div className="flex items-center justify-between">
+        <span className="text-[13px] font-semibold text-muted">In your own words</span>
+        <button type="button" onClick={() => setExamples(true)} className="text-[13px] font-semibold text-safe underline underline-offset-2">
+          For example…
+        </button>
+      </div>
+      <Sheet open={examples} onClose={() => setExamples(false)} title="Things that can count">
+        <p className="text-sm leading-[1.45] text-muted">
+          Councils and companies must consider circumstances like these. Include only what&apos;s true for you.
+        </p>
+        <ul className="list-disc pl-5 text-sm leading-[1.5] flex flex-col gap-1">
+          <li>A disability, illness or health condition, including mental health or neurodivergence such as ADHD or autism</li>
+          <li>You hold a Blue Badge, or were helping someone who does</li>
+          <li>A medical emergency, or caring for a child or relative who needed you urgently</li>
+          <li>A bereavement or a family crisis around that time</li>
+          <li>Your car broke down, or something outside your control stopped you moving it</li>
+          <li>You were pregnant, or had a newborn with you</li>
+        </ul>
+        <p className="text-[12px] leading-[1.45] text-muted">
+          These are examples, not legal advice. Sharing them doesn&apos;t guarantee the charge will be cancelled or reduced. Add
+          evidence if you have it, such as a letter from your doctor.
+        </p>
+        <button type="button" className="btn" onClick={() => setExamples(false)}>
+          Got it
+        </button>
+      </Sheet>
       <label className="field">
-        In your own words
+        <span className="sr-only">In your own words</span>
         <textarea
           rows={3}
           value={value}

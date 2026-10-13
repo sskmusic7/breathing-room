@@ -35,7 +35,12 @@ export default function Page() {
             </span>
           ))}
         </div>
-        <p className="text-center text-xs text-muted">Free · no account needed to start</p>
+        <p className="text-center text-xs text-muted">
+          Free to you · creditors fund us ·{" "}
+          <Link href="/terms" className="underline underline-offset-2">
+            Key Facts
+          </Link>
+        </p>
       </div>
 
       <details className="text-xs text-muted">

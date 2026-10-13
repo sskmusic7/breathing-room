@@ -40,6 +40,7 @@ export default function BankAutopay({
   const [name, setName] = useState("");
   const [email, setEmail] = useState(defaultEmail ?? "");
   const [provider, setProvider] = useState<string | null>(null);
+  const [accepted, setAccepted] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -218,7 +219,35 @@ export default function BankAutopay({
                   </div>
                 </div>
               )}
-              <button onClick={onApprove} disabled={busy || !name || !email} className="btn">
+              {(provider ?? status.providers[0].name) === "gocardless" && (
+                <details className="text-[12px] leading-[1.45] text-muted">
+                  <summary className="cursor-pointer font-semibold text-ink">The Direct Debit Guarantee</summary>
+                  <ul className="list-disc pl-4 mt-1 flex flex-col gap-1">
+                    <li>This Guarantee is offered by all banks and building societies that accept instructions to pay Direct Debits.</li>
+                    <li>
+                      If there are any changes to the amount, date or frequency of your Direct Debit, Breathing Room will notify you 3
+                      working days in advance of your account being debited or as otherwise agreed.
+                    </li>
+                    <li>
+                      If an error is made in the payment of your Direct Debit, by Breathing Room or your bank or building society, you
+                      are entitled to a full and immediate refund of the amount paid from your bank or building society.
+                    </li>
+                    <li>If you receive a refund you are not entitled to, you must pay it back when asked.</li>
+                    <li>You can cancel a Direct Debit at any time by simply contacting your bank or building society. Please also tell us.</li>
+                  </ul>
+                </details>
+              )}
+              <label className="flex items-start gap-2.5 text-[13px] leading-[1.45]">
+                <input type="checkbox" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} className="mt-0.5 w-4 h-4 accent-ink" />
+                <span>
+                  I&apos;m 18 or over, I&apos;ve read the{" "}
+                  <a href="/terms" target="_blank" className="font-semibold underline underline-offset-2">
+                    Key Facts and terms
+                  </a>
+                  , and I agree to collect up to {surplusGbp ? gbp(surplusGbp, 2) : "my surplus"} each payday for the creditors I confirm.
+                </span>
+              </label>
+              <button onClick={onApprove} disabled={busy || !name || !email || !accepted} className="btn">
                 {busy ? "Opening your bank…" : "Approve in my bank"}
               </button>
             </>
