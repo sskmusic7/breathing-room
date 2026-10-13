@@ -62,13 +62,14 @@ def calculate_sfs(request: SfsRequest) -> SfsResult:
 
     allocations: list[CreditorAllocation] = []
 
-    # 1. Priority creditors (HMRC, council tax, court orders) are negotiated on
-    # a separate track directly with each creditor, using the household's full
-    # budget context -- not carved out of the same pot being split across
-    # non-priority creditors below. In hardship cases this typically lands on
-    # the same nominal GBP1/month "holding" offer used for non-priority tokens.
+    # 1. Priority creditors (HMRC, council tax, court orders) are paid first, out
+    # of the same collected surplus: Breathing Room makes one collection on
+    # payday and DebtPots pays priority amounts before anyone else. In hardship
+    # cases this typically lands on a nominal GBP1/month "holding" offer.
+    priority_total = Decimal("0")
     for c in priority:
         offer = c.priority_token_offer if c.priority_token_offer is not None else DEFAULT_TOKEN_OFFER
+        priority_total += offer
         allocations.append(
             CreditorAllocation(
                 creditor_id=c.id,
@@ -82,13 +83,15 @@ def calculate_sfs(request: SfsRequest) -> SfsResult:
             )
         )
 
-    # 2. Non-priority creditors split the full disposable surplus strictly
-    # pro-rata by outstanding balance (the SFS "debt weight" formula):
-    #   payment_to_X = surplus_available * (balance_X / total_non_priority_debt)
+    # 2. Non-priority creditors split what's left strictly pro-rata by
+    # outstanding balance (the SFS "debt weight" formula), so the plan never
+    # promises more than the surplus and matches what DebtPots actually pays:
+    #   payment_to_X = (surplus - priority) * (balance_X / total_non_priority_debt)
+    non_priority_pot = max(allocatable_surplus - priority_total, Decimal("0"))
     for c in non_priority:
         if total_non_priority_debt > 0:
             share_pct = _money((c.balance / total_non_priority_debt) * Decimal("100"))
-            strict_share = allocatable_surplus * (c.balance / total_non_priority_debt)
+            strict_share = non_priority_pot * (c.balance / total_non_priority_debt)
             bps = int((c.balance / total_non_priority_debt * BPS_DENOMINATOR).to_integral_value())
         else:
             share_pct = Decimal("0.00")

@@ -85,12 +85,12 @@ def test_matches_blueprint_worked_example_allocations():
     # Priority: HMRC held to its GBP1 token offer, out of the GBP6.23 surplus.
     assert by_id["hmrc"].pragmatic_offer == Decimal("1.00")
 
-    # Aqua is under a CCJ: real strict pro-rata share of the FULL non-priority
-    # surplus (HMRC's holding token is negotiated separately and does not
-    # shrink this pot), matching the blueprint's 59.1% debt share and GBP3.68
-    # strict/pragmatic (N245 variation) figures exactly.
+    # Aqua is under a CCJ: real strict pro-rata share of what's left after
+    # HMRC's GBP1 (GBP5.23). Deliberate departure from the blueprint, which
+    # splits the full GBP6.23 and so promises GBP7.23 out of GBP6.23: here one
+    # collection pays everyone and DebtPots pays priority first.
     assert by_id["aqua"].debt_share_pct == Decimal("59.09")  # 59.1% at 1dp
-    assert by_id["aqua"].strict_pro_rata_share == Decimal("3.68")
+    assert by_id["aqua"].strict_pro_rata_share == Decimal("3.09")
     assert by_id["aqua"].pragmatic_offer == by_id["aqua"].strict_pro_rata_share
 
     # Every other non-priority (non-CCJ) creditor is in low-surplus territory:
@@ -98,10 +98,10 @@ def test_matches_blueprint_worked_example_allocations():
     for cid in ("halifax", "paypal", "family", "natwest"):
         assert by_id[cid].pragmatic_offer == Decimal("1.00")
 
-    # Sanity: strict shares are proportional to balance and sum back to the
-    # full GBP6.23 non-priority surplus (the blueprint's own "Total Non-Priority" row).
+    # Sanity: strict shares are proportional to balance and sum to the
+    # non-priority pot (GBP6.23 surplus minus HMRC's GBP1).
     strict_total = sum((a.strict_pro_rata_share for a in result.allocations), Decimal("0"))
-    assert abs(strict_total - Decimal("6.23")) < Decimal("0.05")
+    assert abs(strict_total - Decimal("5.23")) < Decimal("0.05")
 
 
 def test_pro_rata_bps_sum_to_ten_thousand_across_non_priority():
@@ -148,3 +148,23 @@ def test_healthy_surplus_uses_strict_pro_rata_not_flat_tokens():
     # not flattened token payments.
     ratio = by_id["a"].pragmatic_offer / by_id["b"].pragmatic_offer
     assert abs(ratio - Decimal("3")) < Decimal("0.05")
+
+
+def test_plan_never_promises_more_than_the_surplus():
+    """Priority first, then pro-rata of what's left: payments add up to the surplus."""
+    from app.sfs_engine.models import Income, Outgoings, SfsRequest, Creditor, DebtCategory
+    result = calculate_sfs(
+        SfsRequest(
+            income=Income(employment_income=Decimal("1640")),
+            outgoings=Outgoings(fixed_costs=Decimal("1100"), flexible_costs=Decimal("400")),
+            savings_buffer=Decimal("5"),
+            creditors=[
+                Creditor(id="ct", name="Council tax", category=DebtCategory.PRIORITY, balance=Decimal("400"), priority_token_offer=Decimal("60")),
+                Creditor(id="pcn", name="Lambeth PCN", category=DebtCategory.NON_PRIORITY, balance=Decimal("70")),
+                Creditor(id="cat", name="Catalogue", category=DebtCategory.NON_PRIORITY, balance=Decimal("600")),
+            ],
+        )
+    )
+    assert result.surplus_for_creditors == Decimal("135.00")
+    total = sum((a.pragmatic_offer for a in result.allocations), Decimal("0"))
+    assert abs(total - Decimal("135.00")) <= Decimal("0.02")
