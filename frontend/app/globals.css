@@ -70,3 +70,16 @@ body {
     @apply text-sm text-rust;
   }
 }
+
+/* Kettle steam on the "put the kettle on" wait screen. */
+@keyframes steam {
+  0% { transform: translateY(4px); opacity: 0; }
+  40% { opacity: 0.8; }
+  100% { transform: translateY(-6px); opacity: 0; }
+}
+.steam {
+  animation: steam 1.8s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .steam { animation: none; }
+}

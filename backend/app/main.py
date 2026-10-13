@@ -21,6 +21,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
+from app import jobs
 from app.accounts import router as accounts_router
 from app.openbanking import payday as bank_payday
 from app.openbanking.routes import router as bank_router
@@ -55,6 +56,7 @@ app = FastAPI(title="Breathing Room API", version="0.1.0", lifespan=lifespan)
 app.include_router(bank_router)
 app.include_router(payouts_router)
 app.include_router(accounts_router)
+app.include_router(jobs.router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -80,6 +82,28 @@ def draft_appeal_endpoint(facts: dict) -> dict:
     mitigating = MitigatingCircumstances(**facts.pop("mitigating", {}))
     notice_facts = NoticeFacts(mitigating=mitigating, **facts)
     return draft_representation_letter(notice_facts)
+
+
+@app.post("/jobs/draft-appeal")
+def draft_appeal_job(facts: dict) -> dict:
+    """Same as /draft-appeal, as a background job the app polls (see app/jobs.py)."""
+    mitigating = MitigatingCircumstances(**facts.pop("mitigating", {}))
+    notice_facts = NoticeFacts(mitigating=mitigating, **facts)
+    job_id = jobs.start(
+        lambda: draft_representation_letter(notice_facts),
+        lambda exc: "We couldn't write your letter just now. Please try again.",
+    )
+    return {"job_id": job_id}
+
+
+@app.post("/jobs/scan-letter")
+def scan_letter_job(body: dict) -> dict:
+    image = body.get("image", "")
+    job_id = jobs.start(
+        lambda: scan_letter(image),
+        lambda exc: str(exc) if isinstance(exc, ScanError) else "We couldn't read that letter just now. Please type the details in.",
+    )
+    return {"job_id": job_id}
 
 
 @app.post("/scan-letter")

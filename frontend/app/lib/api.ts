@@ -266,3 +266,36 @@ export function writeLocalSfs(result: SfsResult): void {
     localStorage.setItem(SFS_RESULT_STORAGE_KEY, JSON.stringify(result));
   } catch {}
 }
+
+// ---- Background jobs for slow requests (letters, scans) ----
+// Start a job, then check back every few seconds. A check that fails (phone
+// locked, app in the background, flaky signal) is simply retried, so a
+// locked screen can't lose the result.
+
+export async function startJob(path: "draft-appeal" | "scan-letter", body: unknown): Promise<string> {
+  const res = await fetch(`${API_URL}/jobs/${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error("We couldn't start that just now. Please try again.");
+  return (await res.json()).job_id;
+}
+
+export async function waitForJob<T>(jobId: string, maxMinutes = 6): Promise<T> {
+  const deadline = Date.now() + maxMinutes * 60_000;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 2500));
+    try {
+      const res = await fetch(`${API_URL}/jobs/${jobId}`);
+      if (res.status === 404) throw new Error("That request expired. Please try again.");
+      if (!res.ok) continue; // server busy or restarting: check again shortly
+      const job = await res.json();
+      if (job.status === "done") return job.result as T;
+      if (job.status === "error") throw new Error(job.error);
+    } catch (err) {
+      if (err instanceof Error && !/fetch|load failed|network/i.test(err.message)) throw err;
+    }
+  }
+  throw new Error("This is taking longer than usual. Please try again.");
+}

@@ -132,10 +132,12 @@ export function LetterIllustration() {
 }
 
 /** A kettle on, two mugs (C2b, not enough left). */
-export function KettleIllustration() {
+export function KettleIllustration({ animated = false }: { animated?: boolean }) {
   return (
     <svg viewBox="0 0 320 84" className="w-full h-[84px] rounded-2xl bg-stripe/60" aria-hidden="true">
-      <path d="M118 22c-4-6 4-10 0-16M128 22c-4-6 4-10 0-16" stroke="#55586B" strokeWidth="1.5" fill="none" strokeLinecap="round" opacity=".6" />
+      <g className={animated ? "steam" : undefined}>
+        <path d="M118 22c-4-6 4-10 0-16M128 22c-4-6 4-10 0-16" stroke="#55586B" strokeWidth="1.5" fill="none" strokeLinecap="round" opacity=".6" />
+      </g>
       <path d="M100 74V42c0-10 8-16 22-16s22 6 22 16v32z" fill="#1F2340" />
       <path d="M144 48l14-8v8l-14 10" fill="#1F2340" />
       <path d="M108 30c0-8 28-8 28 0" stroke="#F3C64B" strokeWidth="3" fill="none" strokeLinecap="round" />

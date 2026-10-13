@@ -162,6 +162,27 @@ export default function SfsPage() {
     }
   }
 
+  // Token plan for when nothing is left over: each creditor's token offer
+  // (usually £1) becomes the plan, so autopilot can still keep things moving.
+  const tokenTotal = result
+    ? result.allocations.reduce((sum, a) => sum + (Number(a.pragmatic_offer) || 1), 0).toFixed(0)
+    : "0";
+  function startTokenPlan() {
+    if (!result) return;
+    const allocations = result.allocations.map((a) => ({
+      ...a,
+      pragmatic_offer: String(Number(a.pragmatic_offer) || 1),
+      pro_rata_share_bps: 0,
+    }));
+    // Non-priority shares of the token pot, by their token amount.
+    const nonPriority = allocations.filter((a) => a.category !== "priority");
+    const npTotal = nonPriority.reduce((s, a) => s + Number(a.pragmatic_offer), 0);
+    for (const a of nonPriority) a.pro_rata_share_bps = npTotal ? Math.round((Number(a.pragmatic_offer) / npTotal) * 10000) : 0;
+    const tokenPlan = { ...result, surplus_for_creditors: tokenTotal, allocations };
+    writeLocalSfs(tokenPlan);
+    window.location.href = "/sweep";
+  }
+
   if (result && Number(result.surplus_for_creditors) <= 0) {
     // C2b: warm and calm, nothing in red; the call is the primary action.
     return (
@@ -173,8 +194,21 @@ export default function SfsPage() {
           <b className="text-ink">That&apos;s not your fault</b>, and it doesn&apos;t mean you&apos;re stuck. Free advisers can
           pause interest and collections, often through the Breathing Space scheme.
         </p>
+        <div className="card flex flex-col gap-2">
+          <h2 className="font-semibold text-[15px]">What we can do now</h2>
+          <p className="text-[13px] leading-[1.45] text-muted">
+            Creditors usually accept a token £1 a month while money is this tight. We can pay those for you automatically, so
+            you stay on track without going short.
+          </p>
+          <button type="button" className="btn" onClick={startTokenPlan}>
+            Set up £{tokenTotal} token payments
+          </button>
+          <Link href="/appeal" className="btn-ghost">
+            Challenge a charge that isn&apos;t fair
+          </Link>
+        </div>
         <div className="mt-auto flex flex-col gap-2.5">
-          <a href="tel:08088084000" className="btn">
+          <a href="tel:08088084000" className="btn-ghost">
             Call National Debtline
             <br />
             <span className="font-normal text-[13px]">0808 808 4000 · free</span>
@@ -183,7 +217,7 @@ export default function SfsPage() {
             Citizens Advice
           </a>
           <a
-            href="https://www.gov.uk/government/publications/debt-respite-scheme-breathing-space-guidance/debt-respite-scheme-breathing-space-guidance-for-the-public"
+            href="https://www.gov.uk/government/publications/debt-respite-scheme-breathing-space-guidance"
             target="_blank"
             rel="noopener noreferrer"
             className="btn-ghost"

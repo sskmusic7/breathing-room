@@ -4,17 +4,20 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useLogin, usePrivy } from "@privy-io/react-auth";
 import {
-  draftAppeal,
   getMe,
   saveMeLetter,
-  scanLetter,
+  startJob,
+  waitForJob,
+  type ScannedLetter,
   type SavedLetter,
   type DraftAppealResult,
   type IssuerType,
   type MitigatingCircumstances,
   type StageOfNotice,
 } from "../lib/api";
-import { TopBar } from "../components/ui";
+import { KettleIllustration, TopBar } from "../components/ui";
+
+const PENDING_LETTER_KEY = "breathing-room:pending-letter";
 
 const ISSUERS: { type: IssuerType; label: string; nameLabel: string; stage: StageOfNotice; hasCode: boolean }[] = [
   { type: "local_council", label: "Council", nameLabel: "Council", stage: "penalty_charge_notice", hasCode: true },
@@ -114,7 +117,8 @@ export default function AppealPage() {
     setScanState("reading");
     setScanError(null);
     try {
-      const f = await scanLetter(await shrinkPhoto(file));
+      const jobId = await startJob("scan-letter", { image: await shrinkPhoto(file) });
+      const f = await waitForJob<ScannedLetter>(jobId, 3);
       if (f.issuer_type) pickIssuer(f.issuer_type);
       if (f.stage_of_notice) setStageOfNotice(f.stage_of_notice);
       if (f.issuer_name) setIssuerName(f.issuer_name);
@@ -136,14 +140,47 @@ export default function AppealPage() {
     if (!on) setMitigating((m) => ({ ...m, holds_blue_badge: false, neurodivergence_or_disability: null, dependant_crisis: null }));
   }
 
+  // If the page was closed while a letter was being written, pick it back up.
+  useEffect(() => {
+    let pending: { jobId: string; issuerName: string; issuerType: IssuerType; referenceNumber: string; amountGbp: string } | null = null;
+    try {
+      pending = JSON.parse(localStorage.getItem(PENDING_LETTER_KEY) || "null");
+    } catch {}
+    if (!pending) return;
+    setIssuerName(pending.issuerName);
+    setIssuerType(pending.issuerType);
+    setReferenceNumber(pending.referenceNumber);
+    setAmountGbp(pending.amountGbp);
+    setStep("letter");
+    setLoading(true);
+    finishLetter(pending.jobId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function finishLetter(jobId: string) {
+    try {
+      const res = await waitForJob<DraftAppealResult>(jobId);
+      setResult(res);
+      ping();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      try {
+        localStorage.removeItem(PENDING_LETTER_KEY);
+      } catch {}
+      setLoading(false);
+    }
+  }
+
   async function draft() {
     setStep("letter");
     setError(null);
     setResult(null);
     setSavedId(null);
     setLoading(true);
+    let jobId: string;
     try {
-      const res = await draftAppeal({
+      jobId = await startJob("draft-appeal", {
         issuer_type: issuerType,
         issuer_name: issuerName,
         contravention_code: contraventionCode || null,
@@ -168,12 +205,15 @@ export default function AppealPage() {
             : {}),
         },
       });
-      setResult(res);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
-    } finally {
       setLoading(false);
+      return;
     }
+    try {
+      localStorage.setItem(PENDING_LETTER_KEY, JSON.stringify({ jobId, issuerName, issuerType, referenceNumber, amountGbp }));
+    } catch {}
+    await finishLetter(jobId);
   }
 
   if (viewing) {
@@ -223,8 +263,11 @@ export default function AppealPage() {
           </details>
         )}
         <h1 className="h2">Tell us about the letter</h1>
-        <label id="scan" className={`card flex items-center gap-3 cursor-pointer ${scanState === "reading" ? "animate-pulse" : ""}`}>
-          <span className="w-10 h-10 flex-none rounded-full bg-butter grid place-items-center" aria-hidden="true">
+        <label
+          id="scan"
+          className={`flex items-center gap-3 cursor-pointer rounded-2xl px-4 py-4 bg-butter/25 border-[1.5px] border-butter ${scanState === "reading" ? "animate-pulse" : ""}`}
+        >
+          <span className="w-12 h-12 flex-none rounded-full bg-butter grid place-items-center" aria-hidden="true">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1F2340" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
               <circle cx="12" cy="13" r="3.5" />
@@ -232,18 +275,17 @@ export default function AppealPage() {
           </span>
           <span className="flex flex-col">
             <span className="font-semibold text-[15px]">
-              {scanState === "reading" ? "Reading your letter…" : scanState === "filled" ? "Scan another letter" : "Scan my letter"}
+              {scanState === "reading" ? "Reading your letter…" : scanState === "filled" ? "Scan another letter" : "Take a photo of your letter"}
             </span>
             <span className="text-[13px] text-muted">
               {scanState === "reading"
-                ? "About 20 seconds. KIMI is reading it."
-                : "Take a photo to fill in your details. Don't worry, your data isn't stored."}
+                ? "Hang tight, we're filling it in for you."
+                : "Tap here and we'll fill in the details for you. Don't worry, your data isn't stored."}
             </span>
           </span>
           <input
             type="file"
             accept="image/*"
-            capture="environment"
             className="sr-only"
             disabled={scanState === "reading"}
             onChange={(e) => {
@@ -257,6 +299,7 @@ export default function AppealPage() {
           <p className="text-[13px] font-semibold text-safe -mt-2">Filled from your photo. Check each line is right.</p>
         )}
         {scanState === "error" && <p className="error -mt-2">{scanError}</p>}
+        <p className="text-[13px] text-muted text-center -my-1">or type the details in yourself</p>
         <div className="flex flex-wrap gap-2">
           {ISSUERS.map((i) => (
             <button key={i.type} type="button" className="chip" aria-pressed={i.type === issuerType} onClick={() => pickIssuer(i.type)}>
@@ -314,8 +357,21 @@ export default function AppealPage() {
     return (
       <div className="wrap">
         <TopBar onBack={() => setStep("details")} />
-        <h1 className="h2">Why should it be cancelled?</h1>
-        <p className="text-[15px] text-muted -mt-2">Tap anything that applies. Not sure? Just write it in your own words.</p>
+        <h1 className="h2">Reason for appeal</h1>
+        <p className="text-[15px] text-muted -mt-2">
+          Tell us what happened, in your own words. Even if it can&apos;t be cancelled, it may be reduced.
+        </p>
+        <label className="field">
+          What happened?
+          <textarea
+            rows={4}
+            value={mitigating.other_notes ?? ""}
+            onChange={(e) => setMitigating((m) => ({ ...m, other_notes: e.target.value || null }))}
+            placeholder="e.g. I stopped for two minutes to drop off my mum, and the sign was behind a tree."
+            className="input placeholder:text-muted/60"
+          />
+        </label>
+        <span className="text-[13px] font-semibold text-muted">Tap any that also apply</span>
         <div className="flex flex-col gap-2">
           {REASONS.map((r) => (
             <button
@@ -329,15 +385,6 @@ export default function AppealPage() {
             </button>
           ))}
         </div>
-        <label className="field">
-          In your own words (optional)
-          <textarea
-            rows={3}
-            value={mitigating.other_notes ?? ""}
-            onChange={(e) => setMitigating((m) => ({ ...m, other_notes: e.target.value || null }))}
-            className="input"
-          />
-        </label>
         <div className="mt-auto">
           <button type="button" className="btn" onClick={() => setStep("health")}>
             Continue
@@ -351,7 +398,7 @@ export default function AppealPage() {
     return (
       <div className="wrap">
         <TopBar onBack={() => setStep("reasons")} />
-        <h1 className="h2 text-[24px]">Was anything making things harder that day?</h1>
+        <h1 className="h2 text-[24px]">Was there anything causing you distress that day?</h1>
 
         <button
           type="button"
@@ -414,12 +461,13 @@ export default function AppealPage() {
       <TopBar onBack={() => setStep("health")} />
       {loading ? (
         <>
-          <h1 className="h2">Writing your letter…</h1>
+          <KettleIllustration animated />
+          <h1 className="h2">Put the kettle on.</h1>
           <p className="text-[15px] leading-[1.45] text-muted">
-            We&apos;re checking it against the law that applies to your letter. This can take up to 2 minutes, so put the kettle
-            on.
+            We&apos;re writing your letter and checking it against the law that applies to you. We&apos;ll give you a shout when
+            it&apos;s ready. You can leave this screen and come back.
           </p>
-          <div className="card h-48 animate-pulse" />
+          <PingMe />
         </>
       ) : error || !result ? (
         <>
@@ -563,4 +611,37 @@ async function shrinkPhoto(file: File): Promise<string> {
   canvas.height = Math.round(bitmap.height * scale);
   canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   return canvas.toDataURL("image/jpeg", 0.85);
+}
+
+// "Give you a shout": a notification (where the phone allows it), a buzz and
+// the tab title, when the letter is ready.
+function ping() {
+  try {
+    navigator.vibrate?.([120, 80, 120]);
+  } catch {}
+  if (typeof document !== "undefined") document.title = "✓ Your letter is ready";
+  try {
+    if ("Notification" in window && Notification.permission === "granted" && document.hidden)
+      new Notification("Your letter is ready", { body: "Breathing Room has finished your letter.", icon: "/icons/android-chrome-192x192.png" });
+  } catch {}
+}
+
+function PingMe() {
+  const [state, setState] = useState<"ask" | "on" | "hidden">("hidden");
+  useEffect(() => {
+    if (!("Notification" in window)) return;
+    setState(Notification.permission === "granted" ? "on" : Notification.permission === "denied" ? "hidden" : "ask");
+  }, []);
+  if (state === "hidden") return null;
+  return state === "on" ? (
+    <p className="text-[13px] font-semibold text-safe">We&apos;ll ping you when it&apos;s ready ✓</p>
+  ) : (
+    <button
+      type="button"
+      className="btn-ghost"
+      onClick={() => Notification.requestPermission().then((p) => setState(p === "granted" ? "on" : "hidden"))}
+    >
+      Ping me when it&apos;s ready
+    </button>
+  );
 }
