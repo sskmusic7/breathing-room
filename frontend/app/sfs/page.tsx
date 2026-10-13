@@ -46,6 +46,7 @@ export default function SfsPage() {
   const [creditors, setCreditors] = useState<CreditorRow[]>([emptyCreditor()]);
 
   const [result, setResult] = useState<SfsResult | null>(null);
+  const [formStep, setFormStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -215,135 +216,164 @@ export default function SfsPage() {
     );
   }
 
+  // Form wizard (Jay): one section at a time with a progress bar.
+  const STEPS = ["Money in", "Living costs", "Who you owe"];
+  const filled = (v: string) => v.trim() !== "";
+  const stepReady = [
+    filled(employmentIncome),
+    filled(fixedCosts) && filled(flexibleCosts),
+    creditors.some((c) => c.name.trim() && c.balance.trim()),
+  ][formStep];
+
   return (
     <div className="wrap">
-      <TopBar back="/" />
-      <h1 className="h2">What comes in, what goes out</h1>
-      <p className="text-[15px] leading-[1.45] text-muted -mt-2">
-        We use the Standard Financial Statement, the same method UK debt charities use. For regulated advice, National Debtline,
-        StepChange and Citizens Advice are free.
-      </p>
-
-      <section className="card flex flex-col gap-2.5">
-        <h2 className="font-semibold text-[15px]">Don&apos;t know your numbers?</h2>
-        <p className="text-[13px] leading-[1.45] text-muted -mt-1">
-          We can fill this in from your last 3 months of bank transactions, averaged per month. Read-only, through TrueLayer (FCA
-          authorised). You can change anything after.
-        </p>
-        {!user ? (
-          <button type="button" onClick={() => login()} className="btn">
-            Fill from my bank
-          </button>
-        ) : !wallet ? (
-          <p className="text-sm text-muted">Setting up your account…</p>
-        ) : !bankConnected ? (
-          <a href={bankConnectUrl(wallet, "sfs")} className="btn">
-            Connect my bank
-          </a>
-        ) : (
-          <button type="button" onClick={fillFromBank} disabled={autoState === "loading"} className="btn">
-            {autoState === "loading" ? "Reading your bank…" : "Fill from my bank"}
-          </button>
-        )}
-        {autoState === "filled" && (
-          <p className="text-[13px] font-semibold text-safe">Filled from your bank (monthly average). Check the numbers look right.</p>
-        )}
-        {autoState === "error" && <p className="error">Couldn&apos;t read your bank just now. You can type the numbers instead.</p>}
-      </section>
-
-      <form onSubmit={onSubmit} className="flex flex-col gap-4">
-        <section className="card flex flex-col gap-3">
-          <h2 className="label-caps">Money in · per month</h2>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Wages" value={employmentIncome} onChange={setEmploymentIncome} />
-            <Field label="Benefits" value={benefitsIncome} onChange={setBenefitsIncome} />
-            <Field label="Other income" value={otherIncome} onChange={setOtherIncome} />
-            <Field label="Deductions" value={deductions} onChange={setDeductions} />
-          </div>
-        </section>
-
-        <section className="card flex flex-col gap-3">
-          <h2 className="label-caps">Living costs · per month</h2>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Rent and bills" value={fixedCosts} onChange={setFixedCosts} />
-            <Field label="Food and everyday" value={flexibleCosts} onChange={setFlexibleCosts} />
-          </div>
-          <label className="field">
-            Safety buffer (£5 to £25)
-            <input
-              type="number"
-              min={5}
-              max={25}
-              value={savingsBuffer}
-              onChange={(e) => setSavingsBuffer(e.target.value)}
-              className="input w-28"
-            />
-          </label>
-        </section>
-
-        <section className="card flex flex-col gap-3">
-          <h2 className="label-caps">Who you owe</h2>
-          {creditors.map((c) => (
-            <div key={c.id} className="flex flex-col gap-2 border-b border-line pb-3 last:border-0 last:pb-0">
-              <div className="grid grid-cols-5 gap-2">
-                <input
-                  placeholder="Who (e.g. Lambeth PCN)"
-                  value={c.name}
-                  onChange={(e) => updateCreditor(c.id, { name: e.target.value })}
-                  className="input col-span-3"
-                />
-                <input
-                  placeholder="Owed £"
-                  type="number"
-                  value={c.balance}
-                  onChange={(e) => updateCreditor(c.id, { balance: e.target.value })}
-                  className="input col-span-2"
-                />
-              </div>
-              <div className="flex flex-wrap gap-1.5 items-center">
-                <button
-                  type="button"
-                  className="chip text-[13px] px-3 py-1.5"
-                  aria-pressed={c.category === "priority"}
-                  onClick={() => updateCreditor(c.id, { category: c.category === "priority" ? "non_priority" : "priority" })}
-                >
-                  Priority (council tax, rent, energy)
-                </button>
-                <button
-                  type="button"
-                  className="chip text-[13px] px-3 py-1.5"
-                  aria-pressed={c.is_ccj}
-                  onClick={() => updateCreditor(c.id, { is_ccj: !c.is_ccj })}
-                >
-                  Court judgment (CCJ)
-                </button>
-              </div>
-              {c.category === "priority" && (
-                <input
-                  placeholder="Agreed monthly payment £ (if any)"
-                  type="number"
-                  value={c.priority_token_offer}
-                  onChange={(e) => updateCreditor(c.id, { priority_token_offer: e.target.value })}
-                  className="input"
-                />
-              )}
-            </div>
+      <TopBar back={formStep === 0 ? "/" : undefined} onBack={formStep > 0 ? () => setFormStep(formStep - 1) : undefined} />
+      <div className="flex flex-col gap-2">
+        <div className="flex gap-1.5" aria-hidden="true">
+          {STEPS.map((label, i) => (
+            <span key={label} className={`h-1.5 flex-1 rounded-full ${i <= formStep ? "bg-ink" : "bg-line"}`} />
           ))}
-          <button
-            type="button"
-            onClick={() => setCreditors((rows) => [...rows, emptyCreditor()])}
-            className="self-start text-sm font-semibold underline underline-offset-[3px]"
-          >
-            + Add another
+        </div>
+        <span className="text-[13px] font-semibold text-muted">
+          Step {formStep + 1} of {STEPS.length} · {STEPS[formStep]}
+        </span>
+      </div>
+
+      {formStep === 0 && (
+        <>
+          <h1 className="h2">What comes in each month?</h1>
+          <section className="card flex flex-col gap-2.5">
+            <h2 className="font-semibold text-[15px]">Don&apos;t know your numbers?</h2>
+            <p className="text-[13px] leading-[1.45] text-muted -mt-1">
+              We can fill this in from your last 3 months of bank transactions, averaged per month. Read-only, through TrueLayer
+              (FCA authorised). You can change anything after.
+            </p>
+            {!user ? (
+              <button type="button" onClick={() => login()} className="btn">
+                Fill from my bank
+              </button>
+            ) : !wallet ? (
+              <p className="text-sm text-muted">Setting up your account…</p>
+            ) : !bankConnected ? (
+              <a href={bankConnectUrl(wallet, "sfs")} className="btn">
+                Connect my bank
+              </a>
+            ) : (
+              <button type="button" onClick={fillFromBank} disabled={autoState === "loading"} className="btn">
+                {autoState === "loading" ? "Reading your bank…" : "Fill from my bank"}
+              </button>
+            )}
+            {autoState === "filled" && (
+              <p className="text-[13px] font-semibold text-safe">Filled from your bank (monthly average). Check the numbers look right.</p>
+            )}
+            {autoState === "error" && <p className="error">Couldn&apos;t read your bank just now. You can type the numbers instead.</p>}
+          </section>
+          <section className="card flex flex-col gap-3">
+            <Field label="Wages" required hint="After tax. Put 0 if you don't work." value={employmentIncome} onChange={setEmploymentIncome} />
+            <Field label="Benefits" hint="e.g. Universal Credit, PIP, Child Benefit" value={benefitsIncome} onChange={setBenefitsIncome} />
+            <Field label="Other income" hint="e.g. maintenance you receive, a pension" value={otherIncome} onChange={setOtherIncome} />
+            <Field
+              label="Deductions"
+              hint="Money taken off before you get it, e.g. Universal Credit advance repayments, or a self-employed loss"
+              value={deductions}
+              onChange={setDeductions}
+            />
+          </section>
+        </>
+      )}
+
+      {formStep === 1 && (
+        <>
+          <h1 className="h2">What has to go out?</h1>
+          <section className="card flex flex-col gap-3">
+            <Field label="Rent and bills" required hint="e.g. rent or mortgage, council tax, energy, water, phone" value={fixedCosts} onChange={setFixedCosts} />
+            <Field label="Food and everyday" required hint="e.g. food, travel, school costs, toiletries" value={flexibleCosts} onChange={setFlexibleCosts} />
+            <label className="field">
+              Safety buffer (£5 to £25)
+              <span className="font-normal text-xs">A little kept back each month for surprises.</span>
+              <input type="number" min={5} max={25} value={savingsBuffer} onChange={(e) => setSavingsBuffer(e.target.value)} className="input w-28" />
+            </label>
+          </section>
+        </>
+      )}
+
+      {formStep === 2 && (
+        <form onSubmit={onSubmit} className="flex flex-col gap-4" id="sfs-form">
+          <h1 className="h2">Who do you owe?</h1>
+          <section className="card flex flex-col gap-3">
+            <p className="text-xs text-muted">
+              Add at least one. <span className="text-rust">*</span> Who and how much are needed.
+            </p>
+            {creditors.map((c) => (
+              <div key={c.id} className="flex flex-col gap-2 border-b border-line pb-3 last:border-0 last:pb-0">
+                <div className="grid grid-cols-5 gap-2">
+                  <input
+                    placeholder="Who * (e.g. Lambeth PCN)"
+                    value={c.name}
+                    onChange={(e) => updateCreditor(c.id, { name: e.target.value })}
+                    className="input col-span-3"
+                  />
+                  <input
+                    placeholder="Owed £ *"
+                    type="number"
+                    value={c.balance}
+                    onChange={(e) => updateCreditor(c.id, { balance: e.target.value })}
+                    className="input col-span-2"
+                  />
+                </div>
+                <div className="flex flex-wrap gap-1.5 items-center">
+                  <button
+                    type="button"
+                    className="chip text-[13px] px-3 py-1.5"
+                    aria-pressed={c.category === "priority"}
+                    onClick={() => updateCreditor(c.id, { category: c.category === "priority" ? "non_priority" : "priority" })}
+                  >
+                    Priority (council tax, rent, energy)
+                  </button>
+                  <button
+                    type="button"
+                    className="chip text-[13px] px-3 py-1.5"
+                    aria-pressed={c.is_ccj}
+                    onClick={() => updateCreditor(c.id, { is_ccj: !c.is_ccj })}
+                  >
+                    Court judgment (CCJ)
+                  </button>
+                </div>
+                {c.category === "priority" && (
+                  <input
+                    placeholder="Agreed monthly payment £ (if any)"
+                    type="number"
+                    value={c.priority_token_offer}
+                    onChange={(e) => updateCreditor(c.id, { priority_token_offer: e.target.value })}
+                    className="input"
+                  />
+                )}
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => setCreditors((rows) => [...rows, emptyCreditor()])}
+              className="self-start text-sm font-semibold underline underline-offset-[3px]"
+            >
+              + Add another
+            </button>
+          </section>
+          {error && <p className="error">{error}</p>}
+        </form>
+      )}
+
+      <div className="mt-auto flex flex-col gap-2">
+        {formStep < 2 ? (
+          <button type="button" className="btn" disabled={!stepReady} onClick={() => setFormStep(formStep + 1)}>
+            Next
           </button>
-        </section>
-
-        {error && <p className="error">{error}</p>}
-
-        <button type="submit" disabled={loading} className="btn">
-          {loading ? "Working it out…" : "See my plan"}
-        </button>
-      </form>
+        ) : (
+          <button type="submit" form="sfs-form" disabled={loading || !stepReady} className="btn">
+            {loading ? "Working it out…" : "See my plan"}
+          </button>
+        )}
+        {!stepReady && <p className="text-center text-xs text-muted">Fill in the fields marked * to carry on. 0 is fine.</p>}
+      </div>
     </div>
   );
 }
@@ -352,15 +382,23 @@ function Field({
   label,
   value,
   onChange,
+  required,
+  hint,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
+  required?: boolean;
+  hint?: string;
 }) {
   return (
     <label className="field">
-      {label}
-      <input type="number" inputMode="decimal" value={value} onChange={(e) => onChange(e.target.value)} className="input" />
+      <span>
+        {label}
+        {required && <span className="text-rust"> *</span>}
+      </span>
+      {hint && <span className="font-normal text-xs -mt-1">{hint}</span>}
+      <input type="number" inputMode="decimal" required={required} value={value} onChange={(e) => onChange(e.target.value)} className="input" />
     </label>
   );
 }

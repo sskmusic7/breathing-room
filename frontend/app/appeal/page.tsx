@@ -155,7 +155,7 @@ export default function AppealPage() {
             <span className="text-[13px] text-muted">
               {scanState === "reading"
                 ? "About 20 seconds. KIMI is reading it."
-                : "Take a photo and we'll fill this in. Not stored."}
+                : "Take a photo to fill in your details. Don't worry, your data isn't stored."}
             </span>
           </span>
           <input
@@ -184,12 +184,12 @@ export default function AppealPage() {
         </div>
 
         <div className="card flex flex-col gap-1">
-          <DetailRow label={issuer.nameLabel} value={issuerName} onChange={setIssuerName} placeholder="e.g. Lambeth" />
-          <DetailRow label="Reference" value={referenceNumber} onChange={setReferenceNumber} placeholder="LB44170921" />
+          <DetailRow label={issuer.nameLabel} required value={issuerName} onChange={setIssuerName} placeholder="e.g. Lambeth" />
+          <DetailRow label="Reference" required value={referenceNumber} onChange={setReferenceNumber} placeholder="LB44170921" />
           {issuer.hasCode && (
             <DetailRow label="Code" value={contraventionCode} onChange={setContraventionCode} placeholder="01" />
           )}
-          <DetailRow label="Happened" type="date" value={dateOfContravention} onChange={setDateOfContravention} />
+          <DetailRow label="Date of occurrence" type="date" value={dateOfContravention} onChange={setDateOfContravention} />
           <DetailRow label="Letter dated" type="date" value={dateOfNotice} onChange={setDateOfNotice} />
           <DetailRow label="Amount" value={amountGbp} onChange={setAmountGbp} placeholder="£70" inputMode="decimal" />
           <label className="row py-1.5">
@@ -214,13 +214,13 @@ export default function AppealPage() {
         {showWhere && (
           <p className="text-sm leading-[1.45] text-muted -mt-2">
             The reference is usually at the top right, near a barcode, and often starts with letters. The code (if there is
-            one) sits next to a short description of what you&apos;re said to have done. &quot;Happened&quot; is the date of
-            the incident; &quot;Letter dated&quot; is the date printed on the letter itself.
+            one) sits next to a short description of what you&apos;re said to have done. &quot;Date of occurrence&quot; is
+            when the incident happened; &quot;Letter dated&quot; is the date printed on the letter itself.
           </p>
         )}
 
         <div className="mt-auto">
-          <button type="button" className="btn" disabled={!issuerName.trim()} onClick={() => setStep("reasons")}>
+          <button type="button" className="btn" disabled={!issuerName.trim() || !referenceNumber.trim()} onClick={() => setStep("reasons")}>
             Continue
           </button>
         </div>
@@ -380,8 +380,10 @@ function DetailRow({
   type = "text",
   placeholder,
   inputMode,
+  required,
 }: {
   label: string;
+  required?: boolean;
   value: string;
   onChange: (v: string) => void;
   type?: string;
@@ -390,7 +392,10 @@ function DetailRow({
 }) {
   return (
     <label className="row py-1.5">
-      <span>{label}</span>
+      <span>
+        {label}
+        {required && <span className="text-rust"> *</span>}
+      </span>
       <input
         type={type}
         value={value}
