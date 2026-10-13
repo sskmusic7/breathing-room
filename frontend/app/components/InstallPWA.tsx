@@ -71,7 +71,7 @@ export const InstallPWA = () => {
   }
 
   return (
-    <div className="fixed bottom-6 right-6 z-50">
+    <div className="fixed bottom-24 inset-x-4 z-50 flex justify-center">
       <div className="bg-card rounded-2xl p-4 border border-line max-w-sm">
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 bg-mint rounded-full flex items-center justify-center">

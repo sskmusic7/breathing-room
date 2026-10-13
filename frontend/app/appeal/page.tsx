@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   draftAppeal,
+  scanLetter,
   type DraftAppealResult,
   type IssuerType,
   type MitigatingCircumstances,
@@ -50,6 +51,8 @@ export default function AppealPage() {
   const [amountGbp, setAmountGbp] = useState("");
   const [referenceNumber, setReferenceNumber] = useState("");
   const [showWhere, setShowWhere] = useState(false);
+  const [scanState, setScanState] = useState<"idle" | "reading" | "filled" | "error">("idle");
+  const [scanError, setScanError] = useState<string | null>(null);
 
   const [consentGiven, setConsentGiven] = useState(false);
   const [mitigating, setMitigating] = useState<MitigatingCircumstances>({});
@@ -64,6 +67,28 @@ export default function AppealPage() {
   function pickIssuer(type: IssuerType) {
     setIssuerType(type);
     setStageOfNotice(ISSUERS.find((i) => i.type === type)!.stage);
+  }
+
+  // Scan a letter: shrink the photo on the phone, then KIMI vision reads it
+  // and fills the form for the user to check.
+  async function onScan(file: File) {
+    setScanState("reading");
+    setScanError(null);
+    try {
+      const f = await scanLetter(await shrinkPhoto(file));
+      if (f.issuer_type) pickIssuer(f.issuer_type);
+      if (f.stage_of_notice) setStageOfNotice(f.stage_of_notice);
+      if (f.issuer_name) setIssuerName(f.issuer_name);
+      if (f.reference_number) setReferenceNumber(f.reference_number);
+      if (f.contravention_code) setContraventionCode(f.contravention_code);
+      if (f.date_of_contravention) setDateOfContravention(f.date_of_contravention);
+      if (f.date_of_notice) setDateOfNotice(f.date_of_notice);
+      if (f.amount_gbp != null) setAmountGbp(String(f.amount_gbp));
+      setScanState("filled");
+    } catch (err) {
+      setScanError(err instanceof Error ? err.message : String(err));
+      setScanState("error");
+    }
   }
 
   function setConsent(on: boolean) {
@@ -116,6 +141,40 @@ export default function AppealPage() {
       <div className="wrap">
         <TopBar back="/" />
         <h1 className="h2">Tell us about the letter</h1>
+        <label id="scan" className={`card flex items-center gap-3 cursor-pointer ${scanState === "reading" ? "animate-pulse" : ""}`}>
+          <span className="w-10 h-10 flex-none rounded-full bg-butter grid place-items-center" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1F2340" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
+              <circle cx="12" cy="13" r="3.5" />
+            </svg>
+          </span>
+          <span className="flex flex-col">
+            <span className="font-semibold text-[15px]">
+              {scanState === "reading" ? "Reading your letter…" : scanState === "filled" ? "Scan another letter" : "Scan my letter"}
+            </span>
+            <span className="text-[13px] text-muted">
+              {scanState === "reading"
+                ? "About 20 seconds. KIMI is reading it."
+                : "Take a photo and we'll fill this in. Not stored."}
+            </span>
+          </span>
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="sr-only"
+            disabled={scanState === "reading"}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onScan(file);
+              e.target.value = "";
+            }}
+          />
+        </label>
+        {scanState === "filled" && (
+          <p className="text-[13px] font-semibold text-safe -mt-2">Filled from your photo. Check each line is right.</p>
+        )}
+        {scanState === "error" && <p className="error -mt-2">{scanError}</p>}
         <div className="flex flex-wrap gap-2">
           {ISSUERS.map((i) => (
             <button key={i.type} type="button" className="chip" aria-pressed={i.type === issuerType} onClick={() => pickIssuer(i.type)}>
@@ -399,4 +458,15 @@ function OwnWords({ value, onChange }: { value: string; onChange: (v: string) =>
       )}
     </div>
   );
+}
+
+// Phone photos are 3-12MB; ~1600px JPEG keeps the text readable and the upload small.
+async function shrinkPhoto(file: File): Promise<string> {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL("image/jpeg", 0.85);
 }

@@ -22,12 +22,12 @@ export default function Page() {
         <Link href="/appeal" className="btn">
           Type in my letter
         </Link>
-        <Link href="/sfs" className="btn-ghost">
+        <Link href="/appeal#scan" className="btn-ghost">
+          Scan a letter
+        </Link>
+        <Link href="/sfs" className="btn-link">
           Sort out what I owe
         </Link>
-        <button type="button" disabled className="btn-link no-underline text-muted font-medium">
-          Scan a letter · soon
-        </button>
         <div className="flex items-center justify-center gap-1.5 flex-wrap">
           {["MaPS SFS method", "Open Banking"].map((t) => (
             <span key={t} className="text-[11px] font-bold text-muted border border-line rounded-md px-[7px] py-[3px]">

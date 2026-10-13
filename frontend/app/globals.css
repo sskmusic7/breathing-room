@@ -8,7 +8,7 @@ body {
 
 @layer components {
   .wrap {
-    @apply max-w-md mx-auto px-5 pt-4 pb-10 flex flex-col gap-4 min-h-screen;
+    @apply max-w-md mx-auto px-5 pt-4 pb-28 flex flex-col gap-4 min-h-screen;
   }
   .h1 {
     @apply font-serif font-normal text-[34px] leading-[1.15] tracking-[-0.005em];

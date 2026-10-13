@@ -116,6 +116,32 @@ export async function draftAppeal(facts: NoticeFacts): Promise<DraftAppealResult
   return res.json();
 }
 
+export interface ScannedLetter {
+  issuer_type: IssuerType | null;
+  issuer_name: string | null;
+  stage_of_notice: StageOfNotice | null;
+  reference_number: string | null;
+  contravention_code: string | null;
+  date_of_contravention: string | null;
+  date_of_notice: string | null;
+  amount_gbp: number | null;
+  creditor_bank: { sort_code?: string; account_no?: string; payee_name?: string } | null;
+}
+
+/** Read a photo of a notice with KIMI vision (backend /scan-letter). */
+export async function scanLetter(imageDataUrl: string): Promise<ScannedLetter> {
+  const res = await fetch(`${API_URL}/scan-letter`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ image: imageDataUrl }),
+  });
+  if (!res.ok) {
+    const detail = await res.json().then((b) => b.detail).catch(() => null);
+    throw new Error(detail ?? "We couldn't read that letter. Please type the details in.");
+  }
+  return res.json();
+}
+
 export const SFS_RESULT_STORAGE_KEY = "br_last_sfs_result";
 
 // ---- Open Banking (TrueLayer sandbox, via the backend's /bank/* routes) ----

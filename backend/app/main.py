@@ -4,6 +4,7 @@ Endpoints:
   GET  /health
   POST /calculate-sfs   - deterministic SFS budget/pro-rata calculation
   POST /draft-appeal    - RAG-grounded representation letter draft
+  POST /scan-letter     - read a photo of a notice with KIMI vision
   GET  /rag/search      - raw legal corpus search (debugging/demo)
 
   /bank/*               - TrueLayer Open Banking: link bank, VRP mandate,
@@ -26,6 +27,7 @@ from app.payouts import worker as payout_worker
 from app.payouts.routes import router as payouts_router
 from app.rag.draft import MitigatingCircumstances, NoticeFacts, draft_representation_letter
 from app.rag.query import query_legal_corpus
+from app.scan import ScanError, scan_letter
 from app.sfs_engine.calculator import calculate_sfs
 from app.sfs_engine.models import SfsRequest, SfsResult
 from app.webhooks.alchemy import notify_payday_deposit, parse_address_activity, verify_signature
@@ -76,6 +78,16 @@ def draft_appeal_endpoint(facts: dict) -> dict:
     mitigating = MitigatingCircumstances(**facts.pop("mitigating", {}))
     notice_facts = NoticeFacts(mitigating=mitigating, **facts)
     return draft_representation_letter(notice_facts)
+
+
+@app.post("/scan-letter")
+def scan_letter_endpoint(body: dict) -> dict:
+    try:
+        return scan_letter(body.get("image", ""))
+    except ScanError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except Exception:
+        raise HTTPException(status_code=502, detail="We couldn't read that letter just now. Please type the details in.")
 
 
 @app.get("/rag/search")
