@@ -9,6 +9,7 @@ const TABS = [
   { href: "/appeal", label: "Letters", icon: "M4 6h16v12H4zM4 7l8 6 8-6" },
   { href: "/sfs", label: "My plan", icon: "M5 20V10M12 20V4M19 20v-7" },
   { href: "/sweep", label: "Autopilot", icon: "M12 3v3M12 18v3M4.6 7.5l2.6 1.5M16.8 15l2.6 1.5M4.6 16.5l2.6-1.5M16.8 9l2.6-1.5M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" },
+  { href: "/proof", label: "Proof", icon: "M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6zM9 12l2 2 4-4" },
 ];
 
 export default function BottomNav() {
@@ -18,7 +19,7 @@ export default function BottomNav() {
       aria-label="Main"
       className="fixed bottom-0 inset-x-0 z-40 bg-card/95 backdrop-blur border-t border-line pb-[env(safe-area-inset-bottom)]"
     >
-      <ul className="max-w-md mx-auto grid grid-cols-4">
+      <ul className="max-w-md mx-auto grid grid-cols-5">
         {TABS.map((t) => {
           const active = t.href === "/" ? path === "/" : path.startsWith(t.href);
           return (

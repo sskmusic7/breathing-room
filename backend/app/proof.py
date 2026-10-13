@@ -134,6 +134,10 @@ def run_demo() -> dict:
         _last_run = time.time()
     if int(_rpc("eth_getBalance", [DEMO_POT, "latest"]), 16) > 0:
         raise HTTPException(status_code=409, detail="The last payday is still being paid out. Give it a minute.")
-    tx = onramp.send_to_pot(DEMO_POT, DEMO_PAYDAY_GBP)
+    try:
+        tx = onramp.send_to_pot(DEMO_POT, DEMO_PAYDAY_GBP)
+    except Exception:
+        _last_run = 0.0
+        raise HTTPException(status_code=502, detail="Couldn't send the test payday just now. Please try again.")
     store.add_event(DEMO_POT, f"Demo payday of £{DEMO_PAYDAY_GBP:.2f} sent into the pot.")
     return {"tx": tx, "amount_gbp": DEMO_PAYDAY_GBP}

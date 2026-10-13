@@ -12,6 +12,7 @@ import time
 
 import httpx
 from eth_account import Account
+from eth_utils import to_checksum_address
 
 MONAD_RPC = os.environ.get("MONAD_RPC_URL", "https://testnet-rpc.monad.xyz")
 MONAD_CHAIN_ID = 10143
@@ -38,7 +39,8 @@ def send_to_pot(pot_address: str, amount_gbp: float) -> str:
     account = Account.from_key(os.environ["ONRAMP_PRIVATE_KEY"])
     value = int(amount_gbp * GBP_TO_MON_RATE * 10**18)
     tx = {
-        "to": pot_address,
+        # eth_account rejects lowercase addresses; stored pot addresses vary in case.
+        "to": to_checksum_address(pot_address),
         "value": value,
         "gas": GAS_LIMIT,
         "gasPrice": int(_rpc("eth_gasPrice", []), 16),

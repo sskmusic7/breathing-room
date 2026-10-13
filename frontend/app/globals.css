@@ -83,3 +83,22 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .steam { animation: none; }
 }
+
+/* Proof page: money travelling down the pipeline to the active step. */
+@keyframes flow {
+  0% { top: 0; opacity: 0; }
+  20% { opacity: 1; }
+  100% { top: calc(100% - 8px); opacity: 0; }
+}
+.flow-dot {
+  position: absolute;
+  left: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: #f3c64b;
+  animation: flow 1.4s ease-in infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .flow-dot { animation: none; }
+}
