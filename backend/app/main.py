@@ -21,6 +21,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.accounts import router as accounts_router
 from app.openbanking import payday as bank_payday
 from app.openbanking.routes import router as bank_router
 from app.payouts import worker as payout_worker
@@ -53,6 +54,7 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="Breathing Room API", version="0.1.0", lifespan=lifespan)
 app.include_router(bank_router)
 app.include_router(payouts_router)
+app.include_router(accounts_router)
 
 app.add_middleware(
     CORSMiddleware,

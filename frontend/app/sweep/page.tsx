@@ -9,7 +9,7 @@ import { DEBT_POTS_ABI, DEBT_POTS_ADDRESS, DEMO_CREDITOR_ADDRESS, GBP_TO_MON_RAT
 import { DEBT_POTS_BYTECODE } from "../lib/debtPotsBytecode";
 import BankAutopay from "../components/BankAutopay";
 import { DemoTag, Sheet, TopBar, gbp } from "../components/ui";
-import { SFS_RESULT_STORAGE_KEY, type SfsResult } from "../lib/api";
+import { getMe, readLocalSfs, saveMeCreditors, type SavedPayee, type SfsResult } from "../lib/api";
 
 const publicClient = createPublicClient({ chain: monadTestnet, transport: http() });
 
@@ -48,7 +48,7 @@ function gbpToWei(gbp: string): bigint {
 }
 
 export default function SweepPage() {
-  const { ready, user } = usePrivy();
+  const { ready, user, getAccessToken } = usePrivy();
   const { login } = useLogin();
   const { sendTransaction } = useSendTransaction();
 
@@ -221,11 +221,9 @@ export default function SweepPage() {
     [creditors]
   );
 
-  // Prefill the creditor table from whatever the SFS screen last calculated.
-  useEffect(() => {
-    const raw = sessionStorage.getItem(SFS_RESULT_STORAGE_KEY);
-    if (!raw) return;
-    const sfs: SfsResult = JSON.parse(raw);
+  // Prefill the creditor table from the last budget (this device first, then
+  // the saved account), then bring back each creditor's saved bank details.
+  const applySfs = useCallback((sfs: SfsResult) => {
     setSurplusGbp(Number(sfs.surplus_for_creditors) || null);
     setProtectedGbp(Number(sfs.total_outgoings) + Number(sfs.savings_buffer) || null);
     setCreditors(
@@ -246,6 +244,47 @@ export default function SweepPage() {
       }))
     );
   }, []);
+
+  useEffect(() => {
+    const sfs = readLocalSfs();
+    if (sfs) applySfs(sfs);
+  }, [applySfs]);
+
+  const [payeesLoaded, setPayeesLoaded] = useState(false);
+  useEffect(() => {
+    if (!user || payeesLoaded) return;
+    (async () => {
+      const token = await getAccessToken();
+      if (!token) return;
+      const me = await getMe(token).catch(() => null);
+      if (!me) return;
+      if (!readLocalSfs() && me.sfs?.result) applySfs(me.sfs.result);
+      const saved = me.creditors ?? {};
+      setCreditors((rows) =>
+        rows.map((r) => {
+          const p = saved[r.id];
+          return p
+            ? { ...r, sortCode: p.sort_code, accountNo: p.account_no, reference: p.reference, address: p.address, city: p.city, postcode: p.postcode }
+            : r;
+        })
+      );
+      setPayeesLoaded(true);
+    })();
+  }, [user, payeesLoaded, getAccessToken, applySfs]);
+
+  // Save creditors' bank details as they're typed, so they survive the tab closing.
+  useEffect(() => {
+    if (!payeesLoaded || creditors.length === 0) return;
+    const id = setTimeout(async () => {
+      const token = await getAccessToken();
+      if (!token) return;
+      const map: Record<string, SavedPayee> = {};
+      for (const c of creditors)
+        map[c.id] = { sort_code: c.sortCode, account_no: c.accountNo, reference: c.reference, address: c.address, city: c.city, postcode: c.postcode };
+      saveMeCreditors(token, map).catch(() => {});
+    }, 1000);
+    return () => clearTimeout(id);
+  }, [creditors, payeesLoaded, getAccessToken]);
 
   async function onForwardFunds() {
     setForwardTx({ status: "pending" });

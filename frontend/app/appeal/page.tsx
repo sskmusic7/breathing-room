@@ -2,9 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useLogin, usePrivy } from "@privy-io/react-auth";
 import {
   draftAppeal,
+  getMe,
+  saveMeLetter,
   scanLetter,
+  type SavedLetter,
   type DraftAppealResult,
   type IssuerType,
   type MitigatingCircumstances,
@@ -64,6 +68,41 @@ export default function AppealPage() {
 
   const issuer = ISSUERS.find((i) => i.type === issuerType)!;
 
+  // Saved letters: every drafted letter is kept on the person's account.
+  const { user, getAccessToken } = usePrivy();
+  const { login } = useLogin();
+  const [letters, setLetters] = useState<SavedLetter[]>([]);
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const [viewing, setViewing] = useState<SavedLetter | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    getAccessToken().then((t) => {
+      if (t) getMe(t).then((me) => setLetters(me.letters)).catch(() => {});
+    });
+  }, [user, getAccessToken]);
+
+  // Save the draft as soon as there's both a letter and a login (also after
+  // "Log in to save" on the letter screen).
+  useEffect(() => {
+    if (!result || !user || savedId) return;
+    (async () => {
+      const token = await getAccessToken();
+      if (!token) return;
+      const saved = await saveMeLetter(token, {
+        issuer_name: issuerName,
+        issuer_type: issuerType,
+        reference_number: referenceNumber || null,
+        amount_gbp: amountGbp || null,
+        letter: result.letter.replace(/\*\*/g, ""),
+      }).catch(() => null);
+      if (saved) {
+        setSavedId(saved.id);
+        setLetters((l) => [saved, ...l]);
+      }
+    })();
+  }, [result, user, savedId, getAccessToken, issuerName, issuerType, referenceNumber, amountGbp]);
+
   function pickIssuer(type: IssuerType) {
     setIssuerType(type);
     setStageOfNotice(ISSUERS.find((i) => i.type === type)!.stage);
@@ -101,6 +140,7 @@ export default function AppealPage() {
     setStep("letter");
     setError(null);
     setResult(null);
+    setSavedId(null);
     setLoading(true);
     try {
       const res = await draftAppeal({
@@ -136,10 +176,52 @@ export default function AppealPage() {
     }
   }
 
+  if (viewing) {
+    return (
+      <div className="wrap">
+        <TopBar onBack={() => setViewing(null)} />
+        <h1 className="h2">{viewing.issuer_name || "Your letter"}</h1>
+        <p className="text-[13px] text-muted -mt-2">
+          {viewing.reference_number ? `Ref ${viewing.reference_number} · ` : ""}
+          Written {new Date(viewing.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+        </p>
+        <div className="bg-white border border-line rounded-[10px] p-4 font-[Georgia,serif] text-[13.5px] leading-[1.6] text-[#222] whitespace-pre-wrap max-h-[58vh] overflow-auto">
+          {viewing.letter}
+        </div>
+        <button type="button" className="btn" onClick={() => navigator.clipboard.writeText(viewing.letter)}>
+          Copy letter
+        </button>
+      </div>
+    );
+  }
+
   if (step === "details") {
     return (
       <div className="wrap">
         <TopBar back="/" />
+        {letters.length > 0 && (
+          <details className="card">
+            <summary className="cursor-pointer font-semibold flex items-center justify-between">
+              <span>Your letters</span>
+              <span className="text-sm text-muted font-medium">{letters.length} saved</span>
+            </summary>
+            <ul className="mt-2 flex flex-col">
+              {letters.map((l) => (
+                <li key={l.id}>
+                  <button type="button" onClick={() => setViewing(l)} className="w-full text-left py-2 border-t border-line flex justify-between gap-2 text-sm">
+                    <span className="font-semibold truncate">
+                      {l.issuer_name || "Letter"}
+                      {l.reference_number ? <span className="text-muted font-normal"> · {l.reference_number}</span> : null}
+                    </span>
+                    <span className="text-muted flex-none">
+                      {new Date(l.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} →
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
         <h1 className="h2">Tell us about the letter</h1>
         <label id="scan" className={`card flex items-center gap-3 cursor-pointer ${scanState === "reading" ? "animate-pulse" : ""}`}>
           <span className="w-10 h-10 flex-none rounded-full bg-butter grid place-items-center" aria-hidden="true">
@@ -364,6 +446,13 @@ export default function AppealPage() {
           >
             {copied ? "Copied ✓" : "Copy letter"}
           </button>
+          {savedId ? (
+            <p className="text-[13px] font-semibold text-safe text-center">Saved to your letters ✓</p>
+          ) : !user ? (
+            <button type="button" className="btn-ghost" onClick={() => login()}>
+              Log in to save this letter
+            </button>
+          ) : null}
           <Link href="/sfs" className="btn-ghost">
             Next: sort out what I owe →
           </Link>

@@ -207,3 +207,62 @@ export const saveBankPlan = (body: {
 
 export const checkPaydayNow = (wallet: string) =>
   bankFetch<BankStatus>(`/check-now?wallet=${encodeURIComponent(wallet)}`, { method: "POST" });
+
+// ---- Saved progress (backend /me, keyed by the verified Privy login) ----
+
+export interface SavedLetter {
+  id: string;
+  created_at: string;
+  issuer_name: string | null;
+  issuer_type: string | null;
+  reference_number: string | null;
+  amount_gbp: string | null;
+  letter: string;
+}
+
+export interface SavedPayee {
+  sort_code: string;
+  account_no: string;
+  reference: string;
+  address: string;
+  city: string;
+  postcode: string;
+}
+
+export interface Me {
+  sfs: { inputs: Record<string, unknown>; result: SfsResult } | null;
+  creditors: Record<string, SavedPayee>;
+  letters: SavedLetter[];
+}
+
+async function meFetch<T>(token: string, path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_URL}/me${path}`, {
+    ...init,
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...(init?.headers ?? {}) },
+  });
+  if (!res.ok) throw new Error(`/me${path} failed: ${res.status}`);
+  return res.json();
+}
+
+export const getMe = (token: string) => meFetch<Me>(token, "");
+export const saveMeSfs = (token: string, inputs: Record<string, unknown>, result: SfsResult) =>
+  meFetch(token, "/sfs", { method: "PUT", body: JSON.stringify({ inputs, result }) });
+export const saveMeCreditors = (token: string, creditors: Record<string, SavedPayee>) =>
+  meFetch(token, "/creditors", { method: "PUT", body: JSON.stringify({ creditors }) });
+export const saveMeLetter = (token: string, letter: Omit<SavedLetter, "id" | "created_at">) =>
+  meFetch<SavedLetter>(token, "/letters", { method: "POST", body: JSON.stringify(letter) });
+
+/** Last SFS result on this device (survives the phone closing the tab). */
+export function readLocalSfs(): SfsResult | null {
+  try {
+    const raw = localStorage.getItem(SFS_RESULT_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+export function writeLocalSfs(result: SfsResult): void {
+  try {
+    localStorage.setItem(SFS_RESULT_STORAGE_KEY, JSON.stringify(result));
+  } catch {}
+}

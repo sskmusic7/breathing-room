@@ -11,6 +11,7 @@ services:
     env_file: .env
     environment:
       BANK_STATE_PATH: /app/state/bank.json
+      ACCOUNTS_STATE_PATH: /app/state/accounts.json
       TRUELAYER_SIGNING_KEY_PATH: /app/secrets/truelayer_signing_private.pem
     volumes:
       - ./state:/app/state

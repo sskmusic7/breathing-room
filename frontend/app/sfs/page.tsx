@@ -9,7 +9,9 @@ import {
   calculateSfs,
   getBankStatus,
   getBankSummary,
-  SFS_RESULT_STORAGE_KEY,
+  getMe,
+  saveMeSfs,
+  writeLocalSfs,
   type Creditor,
   type DebtCategory,
   type SfsResult,
@@ -52,7 +54,7 @@ export default function SfsPage() {
 
   // Auto SFS: fill income/outgoings from the user's real bank transactions
   // (TrueLayer Data API, read-only) instead of asking them to know the numbers.
-  const { user } = usePrivy();
+  const { user, getAccessToken } = usePrivy();
   const { login } = useLogin();
   const wallet = useMemo(() => {
     const embedded = user?.linkedAccounts.find(
@@ -69,6 +71,33 @@ export default function SfsPage() {
       .then((s) => setBankConnected(s.bank_connected))
       .catch(() => {});
   }, [wallet]);
+
+  // Bring back this person's saved budget when they log in (any device).
+  const [restored, setRestored] = useState(false);
+  useEffect(() => {
+    if (!user || restored) return;
+    (async () => {
+      const token = await getAccessToken();
+      if (!token) return;
+      const me = await getMe(token).catch(() => null);
+      setRestored(true);
+      const saved = me?.sfs;
+      if (!saved) return;
+      const i = saved.inputs as Record<string, string> & { creditors?: CreditorRow[] };
+      setEmploymentIncome(i.employmentIncome ?? "");
+      setBenefitsIncome(i.benefitsIncome ?? "");
+      setOtherIncome(i.otherIncome ?? "");
+      setDeductions(i.deductions ?? "");
+      setFixedCosts(i.fixedCosts ?? "");
+      setFlexibleCosts(i.flexibleCosts ?? "");
+      setSavingsBuffer(i.savingsBuffer ?? "5");
+      if (i.creditors?.length) setCreditors(i.creditors);
+      if (saved.result) {
+        setResult(saved.result);
+        writeLocalSfs(saved.result);
+      }
+    })();
+  }, [user, restored, getAccessToken]);
 
   async function fillFromBank() {
     if (!wallet) return;
@@ -120,7 +149,12 @@ export default function SfsPage() {
       };
       const sfsResult = await calculateSfs(payload);
       setResult(sfsResult);
-      sessionStorage.setItem(SFS_RESULT_STORAGE_KEY, JSON.stringify(sfsResult));
+      writeLocalSfs(sfsResult);
+      const token = user ? await getAccessToken() : null;
+      if (token) {
+        const inputs = { employmentIncome, benefitsIncome, otherIncome, deductions, fixedCosts, flexibleCosts, savingsBuffer, creditors };
+        saveMeSfs(token, inputs, sfsResult).catch(() => {});
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
