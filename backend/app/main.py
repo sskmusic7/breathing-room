@@ -21,7 +21,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from app import jobs
+from app import jobs, proof
 from app.accounts import router as accounts_router
 from app.openbanking import payday as bank_payday
 from app.openbanking.routes import router as bank_router
@@ -44,11 +44,24 @@ async def _payday_loop() -> None:
         await asyncio.to_thread(payout_worker.run_all)
 
 
+async def _proof_loop() -> None:
+    """Keeps the public Proof page (app/proof.py) close to live."""
+    while True:
+        await asyncio.sleep(8)
+        for step in (proof.scan, proof.pay_out):
+            try:
+                await asyncio.to_thread(step)
+            except Exception:
+                pass  # transient RPC/provider errors; the next pass retries
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    task = asyncio.create_task(_payday_loop()) if PAYDAY_CHECK_SECONDS > 0 else None
+    tasks = [asyncio.create_task(_proof_loop())]
+    if PAYDAY_CHECK_SECONDS > 0:
+        tasks.append(asyncio.create_task(_payday_loop()))
     yield
-    if task:
+    for task in tasks:
         task.cancel()
 
 
@@ -57,6 +70,7 @@ app.include_router(bank_router)
 app.include_router(payouts_router)
 app.include_router(accounts_router)
 app.include_router(jobs.router)
+app.include_router(proof.router)
 
 app.add_middleware(
     CORSMiddleware,

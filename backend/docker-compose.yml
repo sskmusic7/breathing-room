@@ -16,4 +16,5 @@ services:
     volumes:
       - ./state:/app/state
       - ./secrets:/app/secrets:ro
+      - /var/log/breathing-room-cre.log:/cre/breathing-room-cre.log:ro
     mem_limit: 600m

@@ -1,0 +1,9 @@
+{
+  "chainSelectorName": "monad-testnet",
+  "receiverAddress": "0x95f9aA834e0e9B9930B3a6ebE63053143BE2245f",
+  "targetAddress": "0x7d00c39460995483856d321c56a19703d08c8589",
+  "migrationType": "CUSTOM",
+  "schedule": "0 */2 * * * *",
+  "checkData": "0x",
+  "writeGasLimit": "500000"
+}

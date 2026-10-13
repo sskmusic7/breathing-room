@@ -1,0 +1,20 @@
+#!/bin/bash
+# Breathing Room: Chainlink CRE workflow in the CLI simulator with live
+# --broadcast (writes through Chainlink MockKeystoneForwarder on Monad
+# testnet), while CRE deploy access is pending. Run every 2 min by
+# /etc/cron.d/breathing-room-cre. Remove that file once the workflow is
+# deployed to the Chainlink network.
+# Targets: test-settings = the main app pot; demo-settings = the public
+# demo pot behind the in-app Proof page.
+LOG=/var/log/breathing-room-cre.log
+cd /srv/breathing-room-cre || exit 1
+# keep the log small
+[ -f "$LOG" ] && [ "$(stat -c%s "$LOG")" -gt 2000000 ] && tail -n 2000 "$LOG" > "$LOG.tmp" && mv "$LOG.tmp" "$LOG"
+for T in test-settings demo-settings; do
+  {
+    echo "=== $(date -u +%FT%TZ) [$T]"
+    /root/.cre/bin/cre workflow simulate debtpots-sweep-check \
+      --target=$T --non-interactive --trigger-index 0 --broadcast \
+      --wasm /srv/breathing-room-cre/debtpots-sweep-check.wasm 2>&1 | grep -E "USER LOG|✗|rror|0x[0-9a-fA-F]{64}"
+  } >> "$LOG" 2>&1
+done

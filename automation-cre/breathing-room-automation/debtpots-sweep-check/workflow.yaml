@@ -9,6 +9,15 @@ test-settings:
     config-path: "./config.test.json"
     secrets-path: ""
 
+# Public demo pot for the in-app Proof page (same workflow identity).
+demo-settings:
+  user-workflow:
+    workflow-name: "debtpots-sweep-test"
+  workflow-artifacts:
+    workflow-path: "./main.ts"
+    config-path: "./config.demo.json"
+    secrets-path: ""
+
 # ==========================================================================
 production-settings:
   user-workflow:

@@ -8,6 +8,7 @@ idempotency key: one on-chain payout -> exactly one bank transfer.
 """
 from __future__ import annotations
 
+import hashlib
 import os
 
 import httpx
@@ -55,6 +56,16 @@ def _decode(log: dict) -> dict:
     }
 
 
+def request_id(key: str) -> str:
+    """Revolut's idempotency key (max 40 chars), unique per on-chain payout.
+
+    One sweep pays several creditors in the same transaction, so the key must
+    include the log index: truncating "txhash:index" to 40 chars made every
+    creditor after the first a "duplicate request".
+    """
+    return hashlib.sha1(key.encode()).hexdigest()
+
+
 def pay_out_wallet(wallet: str, head: int) -> None:
     record = store.get(wallet)
     plan = record.get("plan") or {}
@@ -84,7 +95,7 @@ def pay_out_wallet(wallet: str, head: int) -> None:
                 creditor.get("postcode", ""),
             )
             reference = creditor.get("reference") or "Breathing Room payment"
-            revolut.pay(counterparty, event["amount_gbp"], reference, request_id=event["key"].replace("0x", "")[:40])
+            revolut.pay(counterparty, event["amount_gbp"], reference, request_id=request_id(event["key"]))
             paid.add(event["key"])
             store.update(wallet, payouts_done=sorted(paid))
             store.add_event(

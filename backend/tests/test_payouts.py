@@ -57,3 +57,12 @@ def test_ignores_payouts_not_sent_to_the_settlement_address(plan, monkeypatch):
     monkeypatch.setattr(worker, "_logs", lambda pot, s, e: logs if s <= 1000 <= e else [])
     worker.pay_out_wallet(WALLET, head=1000)
     assert plan == []
+
+
+def test_request_id_unique_per_creditor_in_one_sweep():
+    """Several creditors are paid in one transaction; each needs its own Revolut key."""
+    from app.payouts.worker import request_id
+    tx = "0x7dcda55fb1b9d03fe77173746b229266eaa69b67996e7040912ea6c996293d3f"
+    ids = {request_id(f"{tx}:{i}") for i in (6, 7, 8)}
+    assert len(ids) == 3
+    assert all(len(i) <= 40 for i in ids)
