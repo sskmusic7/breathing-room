@@ -10,6 +10,8 @@ interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
 }
 
+const DISMISS_KEY = "breathing-room:install-dismissed";
+
 const isIOS = () => {
   if (typeof window === 'undefined') return false;
   return /iPad|iPhone|iPod/.test(navigator.userAgent);
@@ -27,10 +29,14 @@ export const InstallPWA = () => {
   const [showIOSInstructions, setShowIOSInstructions] = useState(false);
   const [isIOSDevice, setIsIOSDevice] = useState(false);
   const [isInStandalone, setIsInStandalone] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
     setIsIOSDevice(isIOS());
     setIsInStandalone(isStandalone());
+    try {
+      setDismissed(localStorage.getItem(DISMISS_KEY) === "1");
+    } catch {}
 
     const handler = (e: Event) => {
       e.preventDefault();
@@ -39,11 +45,6 @@ export const InstallPWA = () => {
     };
     
     window.addEventListener("beforeinstallprompt", handler);
-
-    // For iOS devices, show install instructions if not in standalone mode
-    if (isIOS() && !isStandalone()) {
-      setShowIOSInstructions(true);
-    }
 
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
@@ -56,12 +57,19 @@ export const InstallPWA = () => {
     promptInstall.prompt();
   };
 
+  const onDismiss = () => {
+    setDismissed(true);
+    try {
+      localStorage.setItem(DISMISS_KEY, "1");
+    } catch {}
+  };
+
   const onIOSInstructionsClick = () => {
     setShowIOSInstructions(!showIOSInstructions);
   };
 
   // Don't show anything if already installed (standalone mode)
-  if (isInStandalone) {
+  if (isInStandalone || dismissed) {
     return null;
   }
 
@@ -100,6 +108,9 @@ export const InstallPWA = () => {
               How?
             </button>
           ) : null}
+          <button type="button" onClick={onDismiss} aria-label="Dismiss" className="text-muted text-lg leading-none px-1">
+            ✕
+          </button>
         </div>
         
         {showIOSInstructions && isIOSDevice && (
