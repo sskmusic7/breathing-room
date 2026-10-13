@@ -1,18 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import localFont from "next/font/local";
+import { Figtree, Young_Serif } from "next/font/google";
 import "./globals.css";
 import PrivyProvider from "./components/privy-provider";
 
-const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist-sans",
-  weight: "100 900",
-});
-const geistMono = localFont({
-  src: "./fonts/GeistMonoVF.woff",
-  variable: "--font-geist-mono",
-  weight: "100 900",
-});
+const figtree = Figtree({ subsets: ["latin"], variable: "--font-figtree" });
+const youngSerif = Young_Serif({ subsets: ["latin"], weight: "400", variable: "--font-young-serif" });
 
 const APP_NAME = "Breathing Room";
 const APP_DEFAULT_TITLE = "Breathing Room";
@@ -29,7 +21,7 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent",
+    statusBarStyle: "default",
     title: APP_DEFAULT_TITLE,
     // startUpImage: [],
   },
@@ -59,10 +51,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "transparent" },
-    { media: "(prefers-color-scheme: dark)", color: "transparent" }
-  ],
+  themeColor: "#F7F2E9",
 };
 
 export default function RootLayout({
@@ -73,7 +62,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${figtree.variable} ${youngSerif.variable}`}
       >
         <PrivyProvider>{children}</PrivyProvider>
       </body>

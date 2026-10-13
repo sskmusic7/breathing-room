@@ -59,6 +59,13 @@ export const DEBT_POTS_ABI = [
   },
   {
     type: "function",
+    name: "withdraw",
+    inputs: [{ name: "amount", type: "uint256", internalType: "uint256" }],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
     name: "owner",
     inputs: [],
     outputs: [{ name: "", type: "address", internalType: "address" }],

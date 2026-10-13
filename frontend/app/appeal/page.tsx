@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   draftAppeal,
@@ -9,16 +9,47 @@ import {
   type MitigatingCircumstances,
   type StageOfNotice,
 } from "../lib/api";
+import { TopBar } from "../components/ui";
+
+const ISSUERS: { type: IssuerType; label: string; nameLabel: string; stage: StageOfNotice; hasCode: boolean }[] = [
+  { type: "local_council", label: "Council", nameLabel: "Council", stage: "penalty_charge_notice", hasCode: true },
+  { type: "private_parking_operator", label: "Private", nameLabel: "Company", stage: "parking_charge_notice", hasCode: false },
+  { type: "police", label: "Police", nameLabel: "Force", stage: "notice_of_intended_prosecution", hasCode: true },
+  { type: "enforcement_agent", label: "Bailiff", nameLabel: "Firm", stage: "notice_to_owner", hasCode: false },
+  { type: "creditor", label: "Creditor", nameLabel: "Creditor", stage: "letter_before_action", hasCode: false },
+  { type: "court", label: "Court", nameLabel: "Claimant", stage: "county_court_claim", hasCode: false },
+];
+
+const STAGES: { value: StageOfNotice; label: string }[] = [
+  { value: "penalty_charge_notice", label: "Penalty charge notice" },
+  { value: "notice_to_owner", label: "Notice to owner" },
+  { value: "charge_certificate", label: "Charge certificate" },
+  { value: "notice_of_intended_prosecution", label: "Notice of intended prosecution" },
+  { value: "parking_charge_notice", label: "Parking charge notice" },
+  { value: "letter_before_action", label: "Letter before action" },
+  { value: "county_court_claim", label: "County court claim" },
+];
+
+const REASONS: { key: "signage_obscured" | "was_loading" | "emergency_pickup"; label: string }[] = [
+  { key: "signage_obscured", label: "The sign was hard to see" },
+  { key: "was_loading", label: "I was loading or unloading" },
+  { key: "emergency_pickup", label: "It was an emergency" },
+];
+
+type Step = "details" | "reasons" | "health" | "letter";
 
 export default function AppealPage() {
-  const [issuerType, setIssuerType] = useState<IssuerType>("private_parking_operator");
+  const [step, setStep] = useState<Step>("details");
+
+  const [issuerType, setIssuerType] = useState<IssuerType>("local_council");
   const [issuerName, setIssuerName] = useState("");
   const [contraventionCode, setContraventionCode] = useState("");
-  const [stageOfNotice, setStageOfNotice] = useState<StageOfNotice>("notice_to_owner");
+  const [stageOfNotice, setStageOfNotice] = useState<StageOfNotice>("penalty_charge_notice");
   const [dateOfContravention, setDateOfContravention] = useState("");
   const [dateOfNotice, setDateOfNotice] = useState("");
   const [amountGbp, setAmountGbp] = useState("");
   const [referenceNumber, setReferenceNumber] = useState("");
+  const [showWhere, setShowWhere] = useState(false);
 
   const [consentGiven, setConsentGiven] = useState(false);
   const [mitigating, setMitigating] = useState<MitigatingCircumstances>({});
@@ -26,13 +57,28 @@ export default function AppealPage() {
   const [result, setResult] = useState<DraftAppealResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  const issuer = ISSUERS.find((i) => i.type === issuerType)!;
+
+  function pickIssuer(type: IssuerType) {
+    setIssuerType(type);
+    setStageOfNotice(ISSUERS.find((i) => i.type === type)!.stage);
+  }
+
+  function setConsent(on: boolean) {
+    setConsentGiven(on);
+    // Turning it off deletes what they typed, as the screen promises.
+    if (!on) setMitigating((m) => ({ ...m, holds_blue_badge: false, neurodivergence_or_disability: null, dependant_crisis: null }));
+  }
+
+  async function draft() {
+    setStep("letter");
     setError(null);
+    setResult(null);
     setLoading(true);
     try {
-      const draft = await draftAppeal({
+      const res = await draftAppeal({
         issuer_type: issuerType,
         issuer_name: issuerName,
         contravention_code: contraventionCode || null,
@@ -41,11 +87,9 @@ export default function AppealPage() {
         date_of_notice: dateOfNotice || null,
         amount_gbp: amountGbp || null,
         reference_number: referenceNumber || null,
-        // Only ever send mitigating fields once consent has been explicitly
-        // given — if consent is withheld, submit an empty object so no
-        // special-category data is included at all.
-        // Reasons (sign, loading, emergency, notes) are always sent; health and
-        // personal-circumstance fields only once consent has been given.
+        // Reasons are always sent; health and personal-circumstance fields
+        // only once consent has been given, so no special-category data is
+        // included without it.
         mitigating: {
           emergency_pickup: mitigating.emergency_pickup,
           signage_obscured: mitigating.signage_obscured,
@@ -55,12 +99,11 @@ export default function AppealPage() {
             ? {
                 holds_blue_badge: mitigating.holds_blue_badge,
                 neurodivergence_or_disability: mitigating.neurodivergence_or_disability,
-                dependant_crisis: mitigating.dependant_crisis,
               }
             : {}),
         },
       });
-      setResult(draft);
+      setResult(res);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -68,242 +111,292 @@ export default function AppealPage() {
     }
   }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-      <div className="max-w-2xl mx-auto px-4 py-8">
-        <Link href="/" className="text-sm text-slate-500 hover:underline">
-          ← Home
-        </Link>
-        <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-100 mt-2 mb-2">
-          Draft a representation
-        </h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
-          Auto-extracting these details from a photo of your notice is coming
-          soon. For now, enter them yourself below.
-        </p>
-
-        <form onSubmit={onSubmit} className="space-y-6">
-          <section className="bg-white dark:bg-slate-800 rounded-lg p-4 space-y-3 shadow-sm">
-            <div className="grid grid-cols-2 gap-3">
-              <label className="text-sm text-slate-600 dark:text-slate-300">
-                Issuer type
-                <select
-                  value={issuerType}
-                  onChange={(e) => setIssuerType(e.target.value as IssuerType)}
-                  className="w-full rounded border border-slate-300 dark:border-slate-600 bg-transparent px-2 py-1 mt-1"
-                >
-                  <option value="local_council">Local council</option>
-                  <option value="private_parking_operator">Private parking operator</option>
-                  <option value="police">Police</option>
-                  <option value="enforcement_agent">Enforcement agent</option>
-                  <option value="creditor">Creditor</option>
-                  <option value="court">Court</option>
-                </select>
-              </label>
-              <label className="text-sm text-slate-600 dark:text-slate-300">
-                Stage of notice
-                <select
-                  value={stageOfNotice}
-                  onChange={(e) => setStageOfNotice(e.target.value as StageOfNotice)}
-                  className="w-full rounded border border-slate-300 dark:border-slate-600 bg-transparent px-2 py-1 mt-1"
-                >
-                  <option value="penalty_charge_notice">Penalty charge notice</option>
-                  <option value="notice_to_owner">Notice to owner</option>
-                  <option value="charge_certificate">Charge certificate</option>
-                  <option value="notice_of_intended_prosecution">
-                    Notice of intended prosecution
-                  </option>
-                  <option value="parking_charge_notice">Parking charge notice</option>
-                  <option value="letter_before_action">Letter before action</option>
-                  <option value="county_court_claim">County court claim</option>
-                </select>
-              </label>
-              <TextField label="Issuer name" value={issuerName} onChange={setIssuerName} />
-              <TextField
-                label="Contravention code"
-                value={contraventionCode}
-                onChange={setContraventionCode}
-              />
-              <TextField
-                label="Date of contravention"
-                type="date"
-                value={dateOfContravention}
-                onChange={setDateOfContravention}
-              />
-              <TextField label="Date of notice" type="date" value={dateOfNotice} onChange={setDateOfNotice} />
-              <TextField label="Amount (£)" value={amountGbp} onChange={setAmountGbp} />
-              <TextField
-                label="Reference number"
-                value={referenceNumber}
-                onChange={setReferenceNumber}
-              />
-            </div>
-          </section>
-
-          <section className="bg-white dark:bg-slate-800 rounded-lg p-4 space-y-3 shadow-sm">
-            <h2 className="font-semibold text-slate-700 dark:text-slate-200">Why should it be cancelled?</h2>
-            <p className="text-xs text-slate-400">Tick anything that applies. Not sure? Leave it and write it in your own words.</p>
-            <div className="grid grid-cols-2 gap-3">
-              <CheckField
-                label="Sign was hard to see"
-                checked={!!mitigating.signage_obscured}
-                onChange={(v) => setMitigating((m) => ({ ...m, signage_obscured: v }))}
-              />
-              <CheckField
-                label="I was loading/unloading"
-                checked={!!mitigating.was_loading}
-                onChange={(v) => setMitigating((m) => ({ ...m, was_loading: v }))}
-              />
-              <CheckField
-                label="It was an emergency"
-                checked={!!mitigating.emergency_pickup}
-                onChange={(v) => setMitigating((m) => ({ ...m, emergency_pickup: v }))}
-              />
-            </div>
-            <TextField
-              label="In your own words (optional)"
-              value={mitigating.other_notes ?? ""}
-              onChange={(v) => setMitigating((m) => ({ ...m, other_notes: v || null }))}
-            />
-          </section>
-
-          <section className="bg-white dark:bg-slate-800 rounded-lg p-4 space-y-3 shadow-sm">
-            <h2 className="font-semibold text-slate-700 dark:text-slate-200">
-              Health or personal circumstances (optional)
-            </h2>
-            <p className="text-xs text-slate-400">Leaving this out won&apos;t weaken your letter.</p>
-            <label className="flex items-start gap-2 text-sm bg-slate-50 dark:bg-slate-900 rounded p-3">
-              <input
-                type="checkbox"
-                className="mt-1"
-                checked={consentGiven}
-                onChange={(e) => {
-                  setConsentGiven(e.target.checked);
-                  if (!e.target.checked)
-                    setMitigating((m) => ({
-                      ...m,
-                      holds_blue_badge: false,
-                      neurodivergence_or_disability: null,
-                      dependant_crisis: null,
-                    }));
-                }}
-              />
-              <span>
-                I give permission for Breathing Room to process my health/neurodivergence
-                details strictly to draft legal mitigating-circumstance letters.
-              </span>
-            </label>
-
-            {!consentGiven && (
-              <p className="text-xs text-slate-400">
-                Tick the box above to add health, disability or caring
-                circumstances. These fields stay hidden until you agree.
-              </p>
-            )}
-
-            {consentGiven && (
-              <div className="space-y-3 border-t border-slate-100 dark:border-slate-700 pt-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <CheckField
-                    label="Holds a Blue Badge"
-                    checked={!!mitigating.holds_blue_badge}
-                    onChange={(v) => setMitigating((m) => ({ ...m, holds_blue_badge: v }))}
-                  />
-                </div>
-                <TextField
-                  label="Neurodivergence or disability (free text, optional)"
-                  value={mitigating.neurodivergence_or_disability ?? ""}
-                  onChange={(v) =>
-                    setMitigating((m) => ({ ...m, neurodivergence_or_disability: v || null }))
-                  }
-                />
-                <TextField
-                  label="Dependant crisis (free text, optional)"
-                  value={mitigating.dependant_crisis ?? ""}
-                  onChange={(v) => setMitigating((m) => ({ ...m, dependant_crisis: v || null }))}
-                />
-              </div>
-            )}
-          </section>
-
-          {error && <p className="text-red-600 text-sm">{error}</p>}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-lg bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 py-3 font-semibold disabled:opacity-50"
-          >
-            {loading ? "Drafting…" : "Draft my representation"}
-          </button>
-          {loading && (
-            <p className="text-xs text-slate-500 text-center">
-              Writing your letter against the relevant law. This can take up to 2 minutes.
-            </p>
-          )}
-        </form>
-
-        {result && (
-          <section className="mt-8 bg-white dark:bg-slate-800 rounded-lg p-4 shadow-sm space-y-3">
-            <h2 className="font-semibold text-slate-700 dark:text-slate-200">Your draft</h2>
-            <pre className="whitespace-pre-wrap text-sm font-sans bg-slate-50 dark:bg-slate-900 rounded p-3">
-              {result.letter}
-            </pre>
-            <p className="text-xs text-slate-400 bg-slate-50 dark:bg-slate-900 rounded p-2">
-              This is a draft only. Breathing Room provides legal information and
-              software tools, not legal advice — review, personalise, and sign it
-              yourself before sending.
-            </p>
-            <button
-              type="button"
-              onClick={() => navigator.clipboard.writeText(result.letter)}
-              className="text-sm text-blue-600 hover:underline"
-            >
-              Copy to clipboard
+  if (step === "details") {
+    return (
+      <div className="wrap">
+        <TopBar back="/" />
+        <h1 className="h2">Tell us about the letter</h1>
+        <div className="flex flex-wrap gap-2">
+          {ISSUERS.map((i) => (
+            <button key={i.type} type="button" className="chip" aria-pressed={i.type === issuerType} onClick={() => pickIssuer(i.type)}>
+              {i.label}
             </button>
-          </section>
+          ))}
+        </div>
+
+        <div className="card flex flex-col gap-1">
+          <DetailRow label={issuer.nameLabel} value={issuerName} onChange={setIssuerName} placeholder="e.g. Lambeth" />
+          <DetailRow label="Reference" value={referenceNumber} onChange={setReferenceNumber} placeholder="LB44170921" />
+          {issuer.hasCode && (
+            <DetailRow label="Code" value={contraventionCode} onChange={setContraventionCode} placeholder="01" />
+          )}
+          <DetailRow label="Happened" type="date" value={dateOfContravention} onChange={setDateOfContravention} />
+          <DetailRow label="Letter dated" type="date" value={dateOfNotice} onChange={setDateOfNotice} />
+          <DetailRow label="Amount" value={amountGbp} onChange={setAmountGbp} placeholder="£70" inputMode="decimal" />
+          <label className="row py-1.5">
+            <span>Letter type</span>
+            <select
+              value={stageOfNotice}
+              onChange={(e) => setStageOfNotice(e.target.value as StageOfNotice)}
+              className="bg-transparent text-right font-semibold outline-none max-w-[60%]"
+            >
+              {STAGES.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <button type="button" onClick={() => setShowWhere((v) => !v)} className="self-start text-sm font-semibold underline underline-offset-[3px]">
+          Where&apos;s this on my letter?
+        </button>
+        {showWhere && (
+          <p className="text-sm leading-[1.45] text-muted -mt-2">
+            The reference is usually at the top right, near a barcode, and often starts with letters. The code (if there is
+            one) sits next to a short description of what you&apos;re said to have done. &quot;Happened&quot; is the date of
+            the incident; &quot;Letter dated&quot; is the date printed on the letter itself.
+          </p>
         )}
+
+        <div className="mt-auto">
+          <button type="button" className="btn" disabled={!issuerName.trim()} onClick={() => setStep("reasons")}>
+            Continue
+          </button>
+        </div>
       </div>
+    );
+  }
+
+  if (step === "reasons") {
+    return (
+      <div className="wrap">
+        <TopBar onBack={() => setStep("details")} />
+        <h1 className="h2">Why should it be cancelled?</h1>
+        <p className="text-[15px] text-muted -mt-2">Tap anything that applies. Not sure? Just write it in your own words.</p>
+        <div className="flex flex-col gap-2">
+          {REASONS.map((r) => (
+            <button
+              key={r.key}
+              type="button"
+              className="chip text-left py-3 rounded-2xl"
+              aria-pressed={!!mitigating[r.key]}
+              onClick={() => setMitigating((m) => ({ ...m, [r.key]: !m[r.key] }))}
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
+        <label className="field">
+          In your own words (optional)
+          <textarea
+            rows={3}
+            value={mitigating.other_notes ?? ""}
+            onChange={(e) => setMitigating((m) => ({ ...m, other_notes: e.target.value || null }))}
+            className="input"
+          />
+        </label>
+        <div className="mt-auto">
+          <button type="button" className="btn" onClick={() => setStep("health")}>
+            Continue
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === "health") {
+    return (
+      <div className="wrap">
+        <TopBar onBack={() => setStep("reasons")} />
+        <h1 className="h2 text-[24px]">Was anything making things harder that day?</h1>
+
+        <button
+          type="button"
+          role="switch"
+          aria-checked={consentGiven}
+          onClick={() => setConsent(!consentGiven)}
+          className={`flex items-center justify-between gap-2.5 bg-card rounded-2xl px-4 py-3.5 border-[1.5px] ${consentGiven ? "border-ink" : "border-line"}`}
+        >
+          <span className="font-semibold text-[15px]">Add this to my letter</span>
+          <span className={`relative w-[46px] h-7 rounded-full flex-none ${consentGiven ? "bg-ink" : "bg-line"}`}>
+            <span className={`absolute top-[3px] w-[22px] h-[22px] rounded-full bg-white transition-all ${consentGiven ? "right-[3px]" : "left-[3px]"}`} />
+          </span>
+        </button>
+
+        {consentGiven ? (
+          <>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[15px]">Blue Badge holder?</span>
+              <span className="flex gap-1.5">
+                {[true, false].map((v) => (
+                  <button
+                    key={String(v)}
+                    type="button"
+                    className="chip text-[13px] px-3 py-[7px]"
+                    aria-pressed={!!mitigating.holds_blue_badge === v}
+                    onClick={() => setMitigating((m) => ({ ...m, holds_blue_badge: v }))}
+                  >
+                    {v ? "Yes" : "No"}
+                  </button>
+                ))}
+              </span>
+            </div>
+            <OwnWords
+              value={mitigating.neurodivergence_or_disability ?? ""}
+              onChange={(v) => setMitigating((m) => ({ ...m, neurodivergence_or_disability: v || null }))}
+            />
+            <p className="text-[13px] leading-[1.45] text-muted">
+              Used only for this letter. Turn it off any time and we delete it. By turning it on, you agree we can use these
+              health or personal details to write this letter, and for nothing else.
+            </p>
+          </>
+        ) : (
+          <p className="text-[15px] leading-[1.45] text-muted">
+            Things like a disability, a health condition or a family emergency can matter. Leaving this off won&apos;t weaken
+            your letter.
+          </p>
+        )}
+
+        <div className="mt-auto">
+          <button type="button" className="btn" onClick={draft}>
+            Write my letter
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="wrap">
+      <TopBar onBack={() => setStep("health")} />
+      {loading ? (
+        <>
+          <h1 className="h2">Writing your letter…</h1>
+          <p className="text-[15px] leading-[1.45] text-muted">
+            We&apos;re checking it against the law that applies to your letter. This can take up to 2 minutes, so put the kettle
+            on.
+          </p>
+          <div className="card h-48 animate-pulse" />
+        </>
+      ) : error || !result ? (
+        <>
+          <h1 className="h2">That didn&apos;t work</h1>
+          <p className="error">{error ?? "Something went wrong."}</p>
+          <button type="button" className="btn" onClick={draft}>
+            Try again
+          </button>
+        </>
+      ) : (
+        <>
+          <h1 className="h2">Your letter is ready</h1>
+          <div className="bg-white border border-line rounded-[10px] p-4 font-[Georgia,serif] text-[13.5px] leading-[1.6] text-[#222] whitespace-pre-wrap max-h-[52vh] overflow-auto">
+            {result.letter.replace(/\*\*/g, "")}
+          </div>
+          <p className="text-xs leading-[1.45] text-muted">Draft only, not legal advice. You check it, sign it and send it.</p>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              navigator.clipboard.writeText(result.letter.replace(/\*\*/g, ""));
+              setCopied(true);
+            }}
+          >
+            {copied ? "Copied ✓" : "Copy letter"}
+          </button>
+          <Link href="/sfs" className="btn-ghost">
+            Next: sort out what I owe →
+          </Link>
+        </>
+      )}
     </div>
   );
 }
 
-function TextField({
+function DetailRow({
   label,
   value,
   onChange,
   type = "text",
+  placeholder,
+  inputMode,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   type?: string;
+  placeholder?: string;
+  inputMode?: "decimal";
 }) {
   return (
-    <label className="text-sm text-slate-600 dark:text-slate-300">
-      {label}
+    <label className="row py-1.5">
+      <span>{label}</span>
       <input
         type={type}
         value={value}
+        placeholder={placeholder}
+        inputMode={inputMode}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded border border-slate-300 dark:border-slate-600 bg-transparent px-2 py-1 mt-1"
+        className="bg-transparent text-right font-semibold outline-none min-w-0 w-[58%] placeholder:text-muted/50 placeholder:font-normal"
       />
     </label>
   );
 }
 
-function CheckField({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
+// "In your own words" with optional voice input (where the browser supports it).
+function OwnWords({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [listening, setListening] = useState(false);
+  const [supported, setSupported] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recRef = useRef<any>(null);
+  const valueRef = useRef(value);
+  valueRef.current = value;
+
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const w = window as any;
+    setSupported(!!(w.SpeechRecognition || w.webkitSpeechRecognition));
+  }, []);
+
+  function toggle() {
+    if (listening) {
+      recRef.current?.stop();
+      return;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const w = window as any;
+    const rec = new (w.SpeechRecognition || w.webkitSpeechRecognition)();
+    rec.lang = "en-GB";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rec.onresult = (e: any) => {
+      const said = e.results[0][0].transcript;
+      onChange(valueRef.current ? `${valueRef.current} ${said}` : said);
+    };
+    rec.onend = () => setListening(false);
+    recRef.current = rec;
+    setListening(true);
+    rec.start();
+  }
+
   return (
-    <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-      {label}
-    </label>
+    <div className="flex flex-col gap-1.5">
+      <label className="field">
+        In your own words
+        <textarea
+          rows={3}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="e.g. I have ADHD and missed the sign while sorting the kids out."
+          className="input rounded-[10px] leading-[1.4] placeholder:text-muted/60"
+        />
+      </label>
+      {supported && (
+        <button type="button" onClick={toggle} className="self-start flex items-center gap-2 text-[13px] font-semibold">
+          <span className={`w-[30px] h-[30px] rounded-full bg-butter grid place-items-center ${listening ? "animate-pulse" : ""}`}>●</span>
+          {listening ? "Listening… tap to stop" : "Tap to speak instead"}
+        </button>
+      )}
+    </div>
   );
 }

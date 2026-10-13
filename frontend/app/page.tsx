@@ -3,61 +3,47 @@ import Link from "next/link";
 
 import SendNotification from "./components/SendNotification";
 import { InstallPWA } from "./components/InstallPWA";
+import { LetterIllustration, TopBar } from "./components/ui";
 
 export const metadata: Metadata = {
   title: "Breathing Room",
 };
 
-const SCREENS = [
-  {
-    href: "/sfs",
-    title: "Standard Financial Statement",
-    description: "Work out your budget and a fair pro-rata split for your creditors.",
-  },
-  {
-    href: "/appeal",
-    title: "Draft a representation",
-    description: "Draft a letter contesting a PCN, fine, or notice — grounded in UK statute.",
-  },
-  {
-    href: "/sweep",
-    title: "Payday sweep",
-    description: "Your payday pays your creditors automatically, after your essentials are protected.",
-  },
-] as const;
-
+// A1 · Landing: within 3 seconds it says no pressure, it's free, and there's a real person.
 export default function Page() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="text-center mb-12">
-          <div className="flex items-center justify-center mb-4">
-            <h1 className="text-4xl md:text-5xl font-bold text-slate-800 dark:text-slate-100">
-              Breathing Room
-            </h1>
-          </div>
-          <p className="text-slate-500 dark:text-slate-400">
-            Debts managed, on autopilot.
-          </p>
-        </div>
+    <div className="wrap">
+      <TopBar helpLabel="Talk to us" />
+      <h1 className="h1 text-[36px]">Don&apos;t pay yet.</h1>
+      <p className="lead">Let&apos;s see what we can cancel, reduce, or pause.</p>
+      <LetterIllustration />
 
-        <div className="grid sm:grid-cols-3 gap-4 mb-12">
-          {SCREENS.map((s) => (
-            <Link
-              key={s.href}
-              href={s.href}
-              className="block rounded-lg bg-white dark:bg-slate-800 p-5 shadow-sm hover:shadow-md transition-shadow"
-            >
-              <h2 className="font-semibold text-slate-800 dark:text-slate-100 mb-1">{s.title}</h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400">{s.description}</p>
-            </Link>
+      <div className="mt-auto flex flex-col gap-2.5">
+        <Link href="/appeal" className="btn">
+          Type in my letter
+        </Link>
+        <Link href="/sfs" className="btn-ghost">
+          Sort out what I owe
+        </Link>
+        <button type="button" disabled className="btn-link no-underline text-muted font-medium">
+          Scan a letter · soon
+        </button>
+        <div className="flex items-center justify-center gap-1.5 flex-wrap">
+          {["MaPS SFS method", "Open Banking"].map((t) => (
+            <span key={t} className="text-[11px] font-bold text-muted border border-line rounded-md px-[7px] py-[3px]">
+              {t}
+            </span>
           ))}
         </div>
+        <p className="text-center text-xs text-muted">Free · no account needed to start</p>
+      </div>
 
-        <div className="space-y-8">
+      <details className="text-xs text-muted">
+        <summary className="cursor-pointer text-center">Notifications</summary>
+        <div className="mt-3">
           <SendNotification />
         </div>
-      </div>
+      </details>
       <InstallPWA />
     </div>
   );

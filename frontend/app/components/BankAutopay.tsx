@@ -10,19 +10,27 @@ import {
   type BankStatus,
   type CreditorPayee,
 } from "../lib/api";
+import { gbp } from "./ui";
 
-// Connect bank (read-only) -> approve automatic payday collection (VRP
-// mandate) -> the backend spots payday and collects only the surplus.
+type StepState = "done" | "active" | "todo";
+
+// C4 · Autopilot. Connect bank (read-only) -> approve automatic payday
+// collection once -> the backend spots payday and collects only the surplus.
+// The activity feed doubles as the progress bar; safety comes first.
 export default function BankAutopay({
   wallet,
   potAddress,
   surplusGbp,
+  protectedGbp,
+  paused,
   defaultEmail,
   payees,
 }: {
   wallet: string;
   potAddress: string;
   surplusGbp: number | null;
+  protectedGbp: number | null;
+  paused: boolean;
   defaultEmail?: string;
   payees: CreditorPayee[];
 }) {
@@ -89,110 +97,155 @@ export default function BankAutopay({
     }
   }
 
-  const button =
-    "rounded bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 px-4 py-2 font-semibold disabled:opacity-50";
-
-  if (!status) return null;
+  if (!status) return <div className="card h-40 animate-pulse" />;
   if (!status.configured) {
-    return (
-      <section className="bg-white dark:bg-slate-800 rounded-lg p-4 mb-4 shadow-sm text-sm text-slate-500">
-        Bank connection is being set up on our side. Check back shortly.
-      </section>
-    );
+    return <div className="card text-sm text-muted">Bank connection is being set up on our side. Check back shortly.</div>;
   }
 
   const approved = status.mandate_status === "authorized";
+  const surplus = status.plan?.surplus_gbp ?? surplusGbp ?? 0;
+
+  // This month's progress, read from the activity feed (newest first).
+  const spottedIdx = status.events.findIndex((e) => e.text.startsWith("Payday spotted"));
+  const cycle = spottedIdx >= 0 ? status.events.slice(0, spottedIdx) : [];
+  const spottedIn = spottedIdx >= 0 ? status.events[spottedIdx].text.match(/£([\d.]+)/)?.[1] : null;
+  const moved = cycle.some((e) => e.text.includes("moved into your pot"));
+  const paid = cycle.some((e) => e.text.includes(" paid to "));
+  const failed = cycle.some((e) => e.text.startsWith("Bank collection") && e.text.includes("failed"));
+
+  const steps: { label: string; done: boolean }[] = [
+    { label: "Bank connected", done: status.bank_connected },
+    { label: "Collection approved in your bank", done: approved },
+    { label: spottedIn ? `Payday spotted · ${gbp(spottedIn)} in` : "Payday spotted", done: spottedIdx >= 0 },
+    { label: `Collecting ${gbp(surplus)}`, done: moved },
+    { label: "Moved into your pot", done: moved },
+    { label: "Creditors paid", done: paid },
+  ];
+  const activeIdx = steps.findIndex((s) => !s.done);
+  const stepState = (i: number): StepState => (steps[i].done ? "done" : i === activeIdx ? "active" : "todo");
+
+  const [kicker, headline] = paused
+    ? ["Paused", "Nothing goes out until you resume"]
+    : !status.bank_connected || !approved
+      ? ["Nearly there", "Let's make it automatic"]
+      : paid
+        ? ["All done this month", "Your creditors have been paid"]
+        : spottedIdx >= 0 && !failed
+          ? ["Payday spotted", moved ? "Paying your creditors now" : `Moving ${gbp(surplus)} for you now`]
+          : ["Autopilot is on", "Waiting for payday"];
 
   return (
-    <section className="bg-white dark:bg-slate-800 rounded-lg p-4 mb-4 shadow-sm">
-      <h2 className="font-semibold text-slate-700 dark:text-slate-200">Your bank</h2>
+    <>
+      <div className="flex flex-col gap-1">
+        <span className="flex items-center gap-1.5 text-[13px] font-bold">
+          <span className={`w-2 h-2 rounded-full ${paused ? "bg-butter" : "bg-safe"}`} />
+          {kicker}
+        </span>
+        <h1 className="h2">{headline}</h1>
+      </div>
+
+      <div className="safe-card flex items-center gap-2.5 text-[15px] font-semibold leading-[1.4]">
+        <span className="w-[22px] h-[22px] flex-none rounded-full bg-safe text-mint grid place-items-center text-[13px]">✓</span>
+        <span>
+          {protectedGbp ? `${gbp(protectedGbp)} protected for rent, bills and food` : "Your rent, bills and food money stays in your bank"}
+        </span>
+      </div>
+
+      <div className="card flex flex-col gap-2">
+        {steps.map((s, i) => {
+          const st = stepState(i);
+          return (
+            <div
+              key={s.label}
+              className={`flex items-center gap-2.5 text-sm ${st === "active" ? "font-bold text-ink" : st === "done" ? "font-medium text-ink" : "font-medium text-muted"}`}
+            >
+              <span className={`w-5 text-center ${st === "done" ? "text-safe" : st === "active" ? "text-ink" : "text-muted"}`}>
+                {st === "done" ? "✓" : st === "active" ? "●" : "○"}
+              </span>
+              {s.label}
+            </div>
+          );
+        })}
+      </div>
 
       {!status.bank_connected ? (
-        <>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-            Link your bank so we can spot payday. Read-only, through TrueLayer (FCA authorised). We can never move
-            money without your approval.
+        <div className="card flex flex-col gap-2.5">
+          <p className="text-[13px] leading-[1.45] text-muted">
+            Link your bank so we can spot payday. Read-only, through TrueLayer (FCA authorised). We can never move money without
+            your approval.
           </p>
-          <a href={bankConnectUrl(wallet)} className={`inline-block ${button}`}>
+          <a href={bankConnectUrl(wallet)} className="btn">
             Connect my bank
           </a>
-        </>
+        </div>
       ) : !approved ? (
-        <>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-            Bank connected. Now approve automatic payday collection, once, in your bank. We only ever take your
-            surplus{surplusGbp ? ` (up to £${surplusGbp.toFixed(2)} a month)` : ""}. Your essentials stay put.
+        <div className="card flex flex-col gap-2.5">
+          <p className="text-[13px] leading-[1.45] text-muted">
+            Now approve automatic payday collection, once, in your bank. We only ever take your surplus
+            {surplusGbp ? ` (up to ${gbp(surplusGbp, 2)} a month)` : ""}. Your essentials stay put.
           </p>
           {!surplusGbp ? (
-            <p className="text-sm text-slate-400">Work out your budget first so we know your surplus.</p>
+            <a href="/sfs" className="btn">
+              Work out my budget first
+            </a>
           ) : status.providers.length === 0 ? (
-            <p className="text-sm text-slate-400">Payment collection is being set up on our side. Check back shortly.</p>
+            <p className="text-sm text-muted">Payment collection is being set up on our side. Check back shortly.</p>
           ) : (
-            <div className="grid grid-cols-2 gap-2">
-              <label className="text-sm">
+            <>
+              <label className="field">
                 Full name
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full rounded border border-slate-300 dark:border-slate-600 bg-transparent px-2 py-1 mt-1"
-                />
+                <input value={name} onChange={(e) => setName(e.target.value)} className="input" autoComplete="name" />
               </label>
-              <label className="text-sm">
+              <label className="field">
                 Email
-                <input
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded border border-slate-300 dark:border-slate-600 bg-transparent px-2 py-1 mt-1"
-                />
+                <input value={email} onChange={(e) => setEmail(e.target.value)} className="input" autoComplete="email" />
               </label>
               {status.providers.length > 1 && (
-                <fieldset className="col-span-2 text-sm">
-                  <legend className="mb-1">How should we collect?</legend>
-                  {status.providers.map((p) => (
-                    <label key={p.name} className="mr-4">
-                      <input
-                        type="radio"
-                        name="provider"
-                        checked={(provider ?? status.providers[0].name) === p.name}
-                        onChange={() => setProvider(p.name)}
-                        className="mr-1"
-                      />
-                      {p.label}
-                    </label>
-                  ))}
-                </fieldset>
+                <div className="field">
+                  How should we collect?
+                  <div className="flex flex-wrap gap-1.5">
+                    {status.providers.map((p) => (
+                      <button
+                        key={p.name}
+                        type="button"
+                        className="chip text-[13px]"
+                        aria-pressed={(provider ?? status.providers[0].name) === p.name}
+                        onClick={() => setProvider(p.name)}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
-              <button onClick={onApprove} disabled={busy || !name || !email} className={`col-span-2 ${button}`}>
+              <button onClick={onApprove} disabled={busy || !name || !email} className="btn">
                 {busy ? "Opening your bank…" : "Approve in my bank"}
               </button>
-            </div>
+            </>
           )}
-        </>
+        </div>
       ) : (
-        <>
-          <p className="text-sm text-green-700 dark:text-green-400 mb-1">
-            ✅ Automatic payday collection is on.
-          </p>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-            When your wages land we collect your £{(status.plan?.surplus_gbp ?? surplusGbp ?? 0).toFixed(2)} surplus
-            and your creditors are paid automatically. {status.collecting ? "Collection in progress…" : ""}
-          </p>
-          <button onClick={onCheckNow} disabled={busy} className={button}>
-            {busy ? "Checking…" : "Check for payday now"}
-          </button>
-        </>
+        <button onClick={onCheckNow} disabled={busy} className="btn-ghost">
+          {busy ? "Checking…" : status.collecting ? "Collecting… check again" : "Check for payday now"}
+        </button>
       )}
 
       {status.events.length > 0 && (
-        <ul className="mt-4 space-y-1 border-t border-slate-100 dark:border-slate-700 pt-3">
-          {status.events.slice(0, 6).map((e) => (
-            <li key={e.at + e.text} className="text-xs text-slate-600 dark:text-slate-300">
-              <span className="text-slate-400">{new Date(e.at).toLocaleString("en-GB")}</span> · {e.text}
-            </li>
-          ))}
-        </ul>
+        <details className="text-[13px]">
+          <summary className="cursor-pointer font-semibold">Activity</summary>
+          <ul className="mt-2 flex flex-col gap-1.5">
+            {status.events.slice(0, 8).map((e) => (
+              <li key={e.at + e.text} className="leading-[1.4]">
+                <span className="text-muted">
+                  {new Date(e.at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                </span>{" "}
+                · {e.text}
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
-      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
-    </section>
+      {error && <p className="error">{error}</p>}
+    </>
   );
 }

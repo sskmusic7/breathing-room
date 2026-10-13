@@ -2,26 +2,71 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  @apply bg-paper text-ink font-sans antialiased;
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
+@layer components {
+  .wrap {
+    @apply max-w-md mx-auto px-5 pt-4 pb-10 flex flex-col gap-4 min-h-screen;
+  }
+  .h1 {
+    @apply font-serif font-normal text-[34px] leading-[1.15] tracking-[-0.005em];
+    text-wrap: pretty;
+  }
+  .h2 {
+    @apply font-serif font-normal text-[26px] leading-[1.15] tracking-[-0.005em];
+    text-wrap: pretty;
+  }
+  .lead {
+    @apply text-[17px] leading-[1.45];
+  }
+  .card {
+    @apply bg-card border border-line rounded-2xl px-4 py-3.5;
+  }
+  .btn {
+    @apply block w-full text-center bg-ink text-white font-semibold text-base py-[15px] px-4 rounded-2xl disabled:opacity-50;
+  }
+  .btn-ghost {
+    @apply block w-full text-center bg-card text-ink border-[1.5px] border-line font-semibold text-[15px] py-[13px] px-4 rounded-2xl disabled:opacity-50;
+  }
+  .btn-link {
+    @apply block text-center text-ink font-semibold text-sm p-2 underline underline-offset-[3px];
+  }
+  .pill {
+    @apply text-[13px] font-semibold px-[11px] py-1.5 rounded-full border-[1.5px] border-line whitespace-nowrap;
+  }
+  .chip {
+    @apply text-sm font-semibold px-3.5 py-2 rounded-full border-[1.5px] border-line bg-card text-ink whitespace-nowrap;
+  }
+  .chip[aria-pressed="true"] {
+    @apply bg-ink text-white border-ink;
+  }
+  .row {
+    @apply flex items-center justify-between gap-2 text-[15px];
+  }
+  .row > :first-child {
+    @apply text-muted;
+  }
+  .row > :last-child {
+    @apply font-semibold text-ink;
+  }
+  .field {
+    @apply flex flex-col gap-1.5 text-[13px] font-semibold text-muted;
+  }
+  .input {
+    @apply w-full rounded-[10px] border-[1.5px] border-line bg-card px-3 py-2.5 text-[15px] font-normal text-ink outline-none focus:border-ink;
+  }
+  .label-caps {
+    @apply text-xs font-bold tracking-[.06em] text-muted uppercase;
+  }
+  .demo-tag {
+    @apply self-center font-mono text-[10px] font-semibold tracking-[.06em] text-muted border border-dashed border-muted rounded-full px-[9px] py-[3px];
+  }
+  .safe-card {
+    @apply bg-mint text-safe rounded-2xl px-4 py-3.5;
+  }
+  .error {
+    @apply text-sm text-rust;
   }
 }

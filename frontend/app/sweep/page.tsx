@@ -8,6 +8,7 @@ import { monadTestnet } from "viem/chains";
 import { DEBT_POTS_ABI, DEBT_POTS_ADDRESS, DEMO_CREDITOR_ADDRESS, GBP_TO_MON_RATE } from "../lib/contracts";
 import { DEBT_POTS_BYTECODE } from "../lib/debtPotsBytecode";
 import BankAutopay from "../components/BankAutopay";
+import { DemoTag, Sheet, TopBar, gbp } from "../components/ui";
 import { SFS_RESULT_STORAGE_KEY, type SfsResult } from "../lib/api";
 
 const publicClient = createPublicClient({ chain: monadTestnet, transport: http() });
@@ -59,6 +60,12 @@ export default function SweepPage() {
   const [depositGbp, setDepositGbp] = useState("1500");
   const [creditors, setCreditors] = useState<SweepCreditorRow[]>([]);
   const [surplusGbp, setSurplusGbp] = useState<number | null>(null);
+  const [protectedGbp, setProtectedGbp] = useState<number | null>(null);
+  const [potBalance, setPotBalance] = useState<string | null>(null);
+  const [potOpen, setPotOpen] = useState(false);
+  const [withdrawAll, setWithdrawAll] = useState(true);
+  const [withdrawGbp, setWithdrawGbp] = useState("");
+  const [withdrawTx, setWithdrawTx] = useState<TxState>({ status: "idle" });
 
   const [potAddress, setPotAddress] = useState<`0x${string}` | null>(null);
   const [planPaused, setPlanPaused] = useState(false);
@@ -147,6 +154,17 @@ export default function SweepPage() {
     };
   }, [walletAddress, potAddress, sendTransaction, fetchBalance]);
 
+  const fetchPotBalance = useCallback(async () => {
+    if (!potAddress) return;
+    setPotBalance(formatEther(await publicClient.getBalance({ address: potAddress })));
+  }, [potAddress]);
+
+  useEffect(() => {
+    fetchPotBalance();
+    const id = setInterval(fetchPotBalance, 15000);
+    return () => clearInterval(id);
+  }, [fetchPotBalance]);
+
   // Debtor-controlled emergency brake (mentor licensing guidance: the user can
   // pause, change or cancel the plan before anything pays out).
   useEffect(() => {
@@ -209,6 +227,7 @@ export default function SweepPage() {
     if (!raw) return;
     const sfs: SfsResult = JSON.parse(raw);
     setSurplusGbp(Number(sfs.surplus_for_creditors) || null);
+    setProtectedGbp(Number(sfs.total_outgoings) + Number(sfs.savings_buffer) || null);
     setCreditors(
       sfs.allocations.map((a) => ({
         id: a.creditor_id,
@@ -280,6 +299,21 @@ export default function SweepPage() {
     }
   }
 
+  // Withdrawing is never blocked: the pot is the user's own money.
+  async function onWithdraw() {
+    if (!potAddress) return;
+    setWithdrawTx({ status: "pending" });
+    try {
+      const amount = withdrawAll ? parseEther(potBalance || "0") : gbpToWei(withdrawGbp);
+      const data = encodeFunctionData({ abi: DEBT_POTS_ABI, functionName: "withdraw", args: [amount] });
+      const result = await sendTransaction({ to: potAddress, data, value: 0 });
+      setWithdrawTx({ status: "success", hash: result.hash });
+      setTimeout(fetchPotBalance, 3000);
+    } catch (err) {
+      setWithdrawTx({ status: "error", error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+
   async function onSweep() {
     setSweepTx({ status: "pending" });
     try {
@@ -293,235 +327,199 @@ export default function SweepPage() {
     }
   }
 
-  if (!ready) return <div className="p-8">Loading…</div>;
+  if (!ready) return <div className="wrap"><div className="card h-40 animate-pulse" /></div>;
+
+  const potGbp = parseFloat(potBalance || "0") / GBP_TO_MON_RATE;
+  const creditorsSaved = creditorsTx.status === "success";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-      <div className="max-w-2xl mx-auto px-4 py-8">
-        <Link href="/" className="text-sm text-slate-500 hover:underline">
-          ← Home
-        </Link>
-        <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-100 mt-2 mb-2">Payday sweep</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
-          Your pot only holds your money between payday landing and it paying out,
-          following the plan you set. Breathing Room never holds your money or
-          negotiates with your creditors for you.
-        </p>
+    <div className="wrap">
+      <TopBar />
 
-        {!user ? (
-          <button
-            onClick={() => login()}
-            className="rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6"
-          >
-            Log in to continue
+      {!user ? (
+        <>
+          <h1 className="h2">Put your plan on autopilot</h1>
+          <p className="text-[15px] leading-[1.45] text-muted">
+            On payday we collect only what&apos;s left after your essentials, and pay each creditor their fair share, with a
+            receipt for every penny. Log in with your email to start.
+          </p>
+          <div className="mt-auto">
+            <button onClick={() => login()} className="btn">
+              Log in with email
+            </button>
+          </div>
+        </>
+      ) : setupError ? (
+        <>
+          <h1 className="h2">Setup hit a snag</h1>
+          <p className="error">{setupError}</p>
+          <button onClick={() => window.location.reload()} className="btn">
+            Try again
           </button>
-        ) : setupError ? (
-          <p className="text-red-600 text-sm">{setupError}</p>
-        ) : !walletAddress || !potAddress ? (
-          <p className="text-slate-500">Setting up your account… this takes a few seconds the first time.</p>
-        ) : (
-          <>
-            <section className="bg-white dark:bg-slate-800 rounded-lg p-4 mb-6 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-slate-400">Your balance (demo money)</p>
-                  <p className="font-semibold text-lg">{balanceLoading ? "…" : weiToGbp(balance)}</p>
-                </div>
-              </div>
-              <button onClick={fetchBalance} className="text-xs text-blue-600 hover:underline mt-1">
-                Refresh
-              </button>
-            </section>
+        </>
+      ) : !walletAddress || !potAddress ? (
+        <>
+          <h1 className="h2">Setting up your account…</h1>
+          <p className="text-[15px] text-muted">This takes a few seconds the first time.</p>
+          <div className="card h-40 animate-pulse" />
+        </>
+      ) : (
+        <>
+          <BankAutopay
+            wallet={walletAddress}
+            potAddress={potAddress}
+            surplusGbp={surplusGbp}
+            protectedGbp={protectedGbp}
+            paused={planPaused}
+            defaultEmail={user.email?.address}
+            payees={payees}
+          />
 
-            <BankAutopay
-              wallet={walletAddress}
-              potAddress={potAddress}
-              surplusGbp={surplusGbp}
-              defaultEmail={user.email?.address}
-              payees={payees}
-            />
-
-            <ActionCard
-              step={0}
-              title={planPaused ? "Payouts are paused" : "Pause payouts"}
-              description={
-                planPaused
-                  ? "Nothing will be paid to creditors until you resume. Your money stays in your pot and you can withdraw it."
-                  : "Need a breather this month? Pause and nothing is paid out until you resume. Only you can do this."
-              }
-              tx={pauseTx}
-            >
-              <button
-                onClick={onTogglePause}
-                disabled={pauseTx.status === "pending"}
-                className="rounded bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 px-4 py-2 font-semibold disabled:opacity-50"
-              >
-                {pauseTx.status === "pending" ? "Saving…" : planPaused ? "Resume payouts" : "Pause this month"}
-              </button>
-            </ActionCard>
-
-            <ActionCard
-              step={1}
-              title="Confirm your creditors"
-              description="Pulled in from your budget. Each creditor gets their fair share of whatever's left after your essentials."
-              tx={creditorsTx}
-            >
+          <details className="card" open={creditors.length > 0 && !creditorsSaved}>
+            <summary className="cursor-pointer font-semibold flex items-center justify-between">
+              <span>Who gets paid</span>
+              <span className="text-sm text-muted font-medium">{creditorsSaved ? "Saved ✓" : `${creditors.length} creditor${creditors.length === 1 ? "" : "s"}`}</span>
+            </summary>
+            <div className="mt-3 flex flex-col gap-3">
               {creditors.length === 0 ? (
-                <p className="text-sm text-slate-400">
-                  No creditors yet —{" "}
-                  <Link href="/sfs" className="text-blue-600 hover:underline">
-                    calculate your SFS
+                <p className="text-sm text-muted">
+                  No creditors yet.{" "}
+                  <Link href="/sfs" className="font-semibold underline underline-offset-[3px] text-ink">
+                    Work out your budget
                   </Link>{" "}
                   first.
                 </p>
               ) : (
-                <div className="space-y-2">
+                <>
+                  <p className="text-[13px] leading-[1.45] text-muted">
+                    Find these on each letter under &quot;how to pay&quot;. Every payment goes by bank transfer with your
+                    reference, so they can match it.
+                  </p>
                   {creditors.map((c) => (
-                    <div key={c.id} className="text-sm border-b border-slate-100 dark:border-slate-700 pb-2">
-                      <div className="flex justify-between">
-                        <span className="truncate font-medium">{c.label}</span>
-                        <span>£{c.debtBalanceGbp} owed</span>
+                    <div key={c.id} className="flex flex-col gap-2 border-t border-line pt-3">
+                      <div className="row">
+                        <span className="font-semibold !text-ink truncate">{c.label}</span>
+                        <span>{gbp(c.debtBalanceGbp)} owed</span>
                       </div>
-                      <div className="grid grid-cols-3 gap-2 mt-1">
-                        <input
-                          placeholder="Their sort code"
-                          value={c.sortCode}
-                          onChange={(e) => updateCreditor(c.id, { sortCode: e.target.value })}
-                          className="rounded border border-slate-300 dark:border-slate-600 bg-transparent px-2 py-1 text-xs"
-                        />
-                        <input
-                          placeholder="Their account no."
-                          value={c.accountNo}
-                          onChange={(e) => updateCreditor(c.id, { accountNo: e.target.value })}
-                          className="rounded border border-slate-300 dark:border-slate-600 bg-transparent px-2 py-1 text-xs"
-                        />
-                        <input
-                          placeholder="Your reference (PCN / account no.)"
-                          value={c.reference}
-                          onChange={(e) => updateCreditor(c.id, { reference: e.target.value })}
-                          className="rounded border border-slate-300 dark:border-slate-600 bg-transparent px-2 py-1 text-xs"
-                        />
-                        <input
-                          placeholder="Their address"
-                          value={c.address}
-                          onChange={(e) => updateCreditor(c.id, { address: e.target.value })}
-                          className="rounded border border-slate-300 dark:border-slate-600 bg-transparent px-2 py-1 text-xs"
-                        />
-                        <input
-                          placeholder="Town / city"
-                          value={c.city}
-                          onChange={(e) => updateCreditor(c.id, { city: e.target.value })}
-                          className="rounded border border-slate-300 dark:border-slate-600 bg-transparent px-2 py-1 text-xs"
-                        />
-                        <input
-                          placeholder="Postcode"
-                          value={c.postcode}
-                          onChange={(e) => updateCreditor(c.id, { postcode: e.target.value })}
-                          className="rounded border border-slate-300 dark:border-slate-600 bg-transparent px-2 py-1 text-xs"
-                        />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input placeholder="Their sort code" value={c.sortCode} inputMode="numeric" onChange={(e) => updateCreditor(c.id, { sortCode: e.target.value })} className="input" />
+                        <input placeholder="Their account no." value={c.accountNo} inputMode="numeric" onChange={(e) => updateCreditor(c.id, { accountNo: e.target.value })} className="input" />
+                        <input placeholder="Your reference (PCN / account no.)" value={c.reference} onChange={(e) => updateCreditor(c.id, { reference: e.target.value })} className="input col-span-2" />
+                        <input placeholder="Their address" value={c.address} onChange={(e) => updateCreditor(c.id, { address: e.target.value })} className="input col-span-2" />
+                        <input placeholder="Town / city" value={c.city} onChange={(e) => updateCreditor(c.id, { city: e.target.value })} className="input" />
+                        <input placeholder="Postcode" value={c.postcode} onChange={(e) => updateCreditor(c.id, { postcode: e.target.value })} className="input" />
                       </div>
                     </div>
                   ))}
-                  <p className="text-xs text-slate-400">
-                    Find these on the creditor&apos;s letter under &quot;how to pay&quot;. Each payment is sent by bank transfer
-                    with your reference, so they can match it.
-                  </p>
-                  <button
-                    onClick={onSetCreditors}
-                    disabled={creditorsTx.status === "pending"}
-                    className="mt-2 rounded bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 px-4 py-2 font-semibold disabled:opacity-50"
-                  >
-                    {creditorsTx.status === "pending" ? "Saving…" : "Confirm creditors"}
+                  <button onClick={onSetCreditors} disabled={creditorsTx.status === "pending"} className="btn">
+                    {creditorsTx.status === "pending" ? "Saving…" : creditorsSaved ? "Saved ✓ · save again" : "Confirm creditors"}
+                  </button>
+                  {creditorsTx.status === "error" && <p className="error">{creditorsTx.error}</p>}
+                </>
+              )}
+            </div>
+          </details>
+
+          <button type="button" onClick={() => setPotOpen(true)} className="card flex items-center justify-between font-semibold text-left">
+            <span>Your pot</span>
+            <span>{gbp(potGbp)} →</span>
+          </button>
+
+          <div className="mt-auto flex flex-col gap-2">
+            <button onClick={onTogglePause} disabled={pauseTx.status === "pending"} className="btn-ghost">
+              {pauseTx.status === "pending" ? "Saving…" : planPaused ? "Resume payouts" : "Pause this month"}
+            </button>
+            {pauseTx.status === "error" && <p className="error">{pauseTx.error}</p>}
+            <DemoTag />
+          </div>
+
+          <Sheet open={potOpen} onClose={() => setPotOpen(false)} title="Of course, it's your money">
+            <div>
+              <span className="label-caps">Your pot</span>
+              <div className="font-serif text-[44px] leading-[1.15]">{gbp(potGbp)}</div>
+              <p className="text-sm leading-[1.45] text-muted">
+                This is yours. {planPaused ? "Payouts are paused, so it stays here until you resume." : "It usually goes out to your creditors within a few minutes."}
+              </p>
+            </div>
+            <p className="text-sm text-muted">Just so you know what&apos;s coming:</p>
+            <div className="bg-paper rounded-[10px] px-3.5 py-3 flex flex-col gap-1.5">
+              <div className="row"><span>Next payments go out</span><span className="font-bold">Payday</span></div>
+              <div className="row"><span>Needed in your pot by then</span><span className="font-bold">{gbp(surplusGbp ?? 0)}</span></div>
+              <div className="row">
+                <span>Left after this</span>
+                <span>{gbp(withdrawAll ? 0 : Math.max(0, potGbp - Number(withdrawGbp || 0)))}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button type="button" className="chip text-[13px] px-3 py-[7px]" aria-pressed={withdrawAll} onClick={() => setWithdrawAll(true)}>
+                All {gbp(potGbp)}
+              </button>
+              <button type="button" className="chip text-[13px] px-3 py-[7px]" aria-pressed={!withdrawAll} onClick={() => setWithdrawAll(false)}>
+                Part of it
+              </button>
+              {!withdrawAll && (
+                <input value={withdrawGbp} onChange={(e) => setWithdrawGbp(e.target.value)} placeholder="£" inputMode="decimal" className="input py-1.5 w-24" />
+              )}
+            </div>
+            <button
+              onClick={onWithdraw}
+              disabled={withdrawTx.status === "pending" || potGbp <= 0 || (!withdrawAll && !(Number(withdrawGbp) > 0))}
+              className="btn"
+            >
+              {withdrawTx.status === "pending" ? "Withdrawing…" : "Withdraw"}
+            </button>
+            {withdrawTx.status === "success" && <p className="text-[13px] font-semibold text-safe text-center">Done. It&apos;s on its way back to you.</p>}
+            {withdrawTx.status === "error" && <p className="error">{withdrawTx.error}</p>}
+            <a href="tel:08088084000" className="btn-link">
+              Something came up? Talk to National Debtline (free)
+            </a>
+          </Sheet>
+
+          <details className="text-xs text-muted">
+            <summary className="cursor-pointer text-center">Demo controls (manual payday)</summary>
+            <div className="mt-3 flex flex-col gap-3">
+              <p className="text-center">Demo money in your account: {balanceLoading ? "…" : weiToGbp(balance)}</p>
+              <ActionCard step={1} title="Payday lands" description="Pretend it's payday: move your wages into your pot." tx={forwardTx}>
+                <div className="flex gap-2 items-end">
+                  <label className="field flex-1">
+                    Amount (£)
+                    <input type="number" value={depositGbp} onChange={(e) => setDepositGbp(e.target.value)} className="input" />
+                  </label>
+                  <button onClick={onForwardFunds} disabled={forwardTx.status === "pending"} className="btn w-auto px-5 py-2.5">
+                    {forwardTx.status === "pending" ? "Moving…" : "Pay in"}
                   </button>
                 </div>
-              )}
-            </ActionCard>
-
-            <details className="mb-4">
-              <summary className="text-xs text-slate-400 cursor-pointer mb-2">Demo controls (manual payday)</summary>
-            <ActionCard
-              step={1}
-              title="Payday lands"
-              description="Pretend it's payday: move your wages into your pot."
-              tx={forwardTx}
-            >
-              <div className="flex gap-2 items-end">
-                <label className="text-sm flex-1">
-                  Amount (£)
-                  <input
-                    type="number"
-                    value={depositGbp}
-                    onChange={(e) => setDepositGbp(e.target.value)}
-                    className="w-full rounded border border-slate-300 dark:border-slate-600 bg-transparent px-2 py-1 mt-1"
-                  />
-                </label>
-                <button
-                  onClick={onForwardFunds}
-                  disabled={forwardTx.status === "pending"}
-                  className="rounded bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 px-4 py-2 font-semibold disabled:opacity-50"
-                >
-                  {forwardTx.status === "pending" ? "Moving…" : "Pay in"}
+              </ActionCard>
+              <ActionCard
+                step={2}
+                title="Protect your essentials"
+                description="Ring-fence living costs and a buffer inside the pot (only needed when wages go straight into the pot)."
+                tx={allowanceTx}
+              >
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="field">
+                    Living allowance (£)
+                    <input type="number" value={livingAllowanceGbp} onChange={(e) => setLivingAllowanceGbp(e.target.value)} className="input" />
+                  </label>
+                  <label className="field">
+                    Savings buffer (£)
+                    <input type="number" value={savingsBufferGbp} onChange={(e) => setSavingsBufferGbp(e.target.value)} className="input" />
+                  </label>
+                </div>
+                <button onClick={onSetAllowance} disabled={allowanceTx.status === "pending"} className="btn mt-2">
+                  {allowanceTx.status === "pending" ? "Saving…" : "Save"}
                 </button>
-              </div>
-            </ActionCard>
-
-            <ActionCard
-              step={2}
-              title="Protect your essentials"
-              description="Ring-fence your essential living costs and savings buffer — these always come back to you first."
-              tx={allowanceTx}
-            >
-              <div className="grid grid-cols-2 gap-2">
-                <label className="text-sm">
-                  Living allowance (£)
-                  <input
-                    type="number"
-                    value={livingAllowanceGbp}
-                    onChange={(e) => setLivingAllowanceGbp(e.target.value)}
-                    className="w-full rounded border border-slate-300 dark:border-slate-600 bg-transparent px-2 py-1 mt-1"
-                  />
-                </label>
-                <label className="text-sm">
-                  Savings buffer (£)
-                  <input
-                    type="number"
-                    value={savingsBufferGbp}
-                    onChange={(e) => setSavingsBufferGbp(e.target.value)}
-                    className="w-full rounded border border-slate-300 dark:border-slate-600 bg-transparent px-2 py-1 mt-1"
-                  />
-                </label>
-              </div>
-              <button
-                onClick={onSetAllowance}
-                disabled={allowanceTx.status === "pending"}
-                className="mt-2 rounded bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 px-4 py-2 font-semibold disabled:opacity-50"
-              >
-                {allowanceTx.status === "pending" ? "Saving…" : "Save"}
-              </button>
-            </ActionCard>
-
-
-            <ActionCard
-              step={4}
-              title="Pay your creditors"
-              description="This normally happens by itself a couple of minutes after payday lands. Tap to do it now."
-              tx={sweepTx}
-            >
-              <button
-                onClick={onSweep}
-                disabled={sweepTx.status === "pending"}
-                className="rounded bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 px-4 py-2 font-semibold disabled:opacity-50"
-              >
-                {sweepTx.status === "pending" ? "Paying…" : "Pay now"}
-              </button>
-            </ActionCard>
-            </details>
-            <p className="text-[11px] text-slate-400 text-center mt-6">
-              Payments settle on Monad. Automation by Chainlink. Accounts by Privy.
-            </p>
-          </>
-        )}
-      </div>
+              </ActionCard>
+              <ActionCard step={3} title="Pay your creditors" description="This normally happens by itself a couple of minutes after money lands. Tap to do it now." tx={sweepTx}>
+                <button onClick={onSweep} disabled={sweepTx.status === "pending"} className="btn">
+                  {sweepTx.status === "pending" ? "Paying…" : "Pay now"}
+                </button>
+              </ActionCard>
+            </div>
+          </details>
+          <p className="text-[11px] text-muted text-center">Payments settle on Monad. Automation by Chainlink. Accounts by Privy.</p>
+        </>
+      )}
     </div>
   );
 }
@@ -540,23 +538,23 @@ function ActionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="bg-white dark:bg-slate-800 rounded-lg p-4 mb-4 shadow-sm">
-      <h2 className="font-semibold text-slate-700 dark:text-slate-200">
+    <section className="card text-ink">
+      <h2 className="font-semibold text-[15px]">
         {step > 0 ? `${step}. ` : ""}{title}
       </h2>
-      <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">{description}</p>
+      <p className="text-xs text-muted mb-3">{description}</p>
       {children}
       {tx.status === "success" && tx.hash && (
         <a
           href={`https://testnet.monadscan.com/tx/${tx.hash}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="block mt-2 text-xs text-green-600 hover:underline"
+          className="block mt-2 text-xs font-semibold text-safe underline"
         >
           ✅ Done · view receipt
         </a>
       )}
-      {tx.status === "error" && <p className="mt-2 text-xs text-red-600">{tx.error}</p>}
+      {tx.status === "error" && <p className="mt-2 error">{tx.error}</p>}
     </section>
   );
 }
