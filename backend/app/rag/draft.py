@@ -179,8 +179,17 @@ payment amount will remain available while you consider this.
 {SIGN_OFF}"""
 
 
+def _uk_date(value: str | None) -> str | None:
+    """2025-12-25 -> 25/12/2025, the format UK letters use."""
+    if value and len(value) == 10 and value[4] == "-" and value[7] == "-":
+        return f"{value[8:10]}/{value[5:7]}/{value[0:4]}"
+    return value
+
+
 def draft_representation_letter(facts: NoticeFacts) -> dict:
     """Returns {"letter": str, "citations": [...], "used_llm": bool}."""
+    facts.date_of_notice = _uk_date(facts.date_of_notice)
+    facts.date_of_contravention = _uk_date(facts.date_of_contravention)
     context = _retrieve_context(facts)
     api_key = os.environ.get("MOONSHOT_API_KEY")
 

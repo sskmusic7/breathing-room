@@ -559,7 +559,7 @@ function LettersToAdd({ existing, onAdd }: { existing: string[]; onAdd: (name: s
   if (toAdd.length === 0) return null;
   return (
     <section className="card flex flex-col gap-2">
-      <h2 className="font-semibold text-[15px]">From the letters you scanned</h2>
+      <h2 className="font-semibold text-[15px]">From your letters</h2>
       {toAdd.map((l) => (
         <button
           key={l.name}

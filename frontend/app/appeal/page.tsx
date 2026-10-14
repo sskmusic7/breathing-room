@@ -178,6 +178,18 @@ export default function AppealPage() {
   }
 
   async function draft() {
+    // Remember this charge so "Who do you owe" can add it in one tap.
+    saveLetterCreditor({
+      issuer_type: issuerType,
+      issuer_name: issuerName,
+      stage_of_notice: stageOfNotice,
+      reference_number: referenceNumber || null,
+      contravention_code: null,
+      date_of_contravention: null,
+      date_of_notice: null,
+      amount_gbp: amountGbp ? Number(amountGbp.replace(/[^0-9.]/g, "")) || null : null,
+      creditor_bank: null,
+    });
     setStep("letter");
     setError(null);
     setResult(null);
