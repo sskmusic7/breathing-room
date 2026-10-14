@@ -11,6 +11,7 @@ import {
   getBankSummary,
   getMe,
   readLetterCreditors,
+  readLocalSfs,
   saveMeSfs,
   writeLocalSfs,
   type Creditor,
@@ -90,6 +91,9 @@ export default function SfsPage() {
         if (i.creditors?.length) setCreditors(i.creditors);
       }
     } catch {}
+    // Coming back to My plan shows the finished plan, not step 1.
+    const last = readLocalSfs();
+    if (last) setResult(last);
     setLocalLoaded(true);
   }, []);
   useEffect(() => {
@@ -291,9 +295,20 @@ export default function SfsPage() {
                   <span className="text-[11px] font-bold bg-butter text-ink px-1.5 py-0.5 rounded-[3px]">priority</span>
                 )}
               </span>
-              <span>{gbp(a.pragmatic_offer)}</span>
+              <span className="text-right">
+                {gbp(a.pragmatic_offer)}
+                {Number(a.pragmatic_offer) > 0 && (
+                  <span className="block text-[11px] font-normal text-muted">
+                    {clearIn(Number(a.balance), Number(a.pragmatic_offer))}
+                  </span>
+                )}
+              </span>
             </div>
           ))}
+          <p className="text-[12px] leading-[1.45] text-muted">
+            There is no legal maximum length for a repayment plan. Creditors are expected to accept what you can afford after
+            essentials, and many will freeze interest once a fair plan is agreed.
+          </p>
         </div>
         {result.is_token_payment_territory && (
           <p className="text-[13px] leading-[1.45] text-muted">
@@ -436,7 +451,7 @@ export default function SfsPage() {
                     className="input col-span-3"
                   />
                   <input
-                    placeholder="Amount owed (£) *"
+                    placeholder="Owed (£) *"
                     type="number"
                     value={c.balance}
                     onChange={(e) => updateCreditor(c.id, { balance: e.target.value })}
@@ -461,6 +476,15 @@ export default function SfsPage() {
                     Court judgment (CCJ)
                   </button>
                 </div>
+                {creditors.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setCreditors((rows) => rows.filter((r) => r.id !== c.id))}
+                    className="self-start text-[13px] font-semibold text-rust underline underline-offset-2"
+                  >
+                    Remove this creditor
+                  </button>
+                )}
                 {c.category === "priority" && (
                   <input
                     placeholder="Agreed monthly payment in £ (if you have one)"
@@ -549,4 +573,11 @@ function LettersToAdd({ existing, onAdd }: { existing: string[]; onAdd: (name: s
       ))}
     </section>
   );
+}
+
+function clearIn(balance: number, monthly: number): string {
+  const months = Math.ceil(balance / monthly);
+  if (months <= 1) return "Cleared in 1 month";
+  if (months < 24) return `Cleared in about ${months} months`;
+  return `Cleared in about ${Math.round(months / 12)} years`;
 }

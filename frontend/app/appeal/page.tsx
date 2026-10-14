@@ -34,7 +34,7 @@ const STAGES: { value: StageOfNotice; label: string }[] = [
   { value: "penalty_charge_notice", label: "Penalty charge notice" },
   { value: "notice_to_owner", label: "Notice to owner" },
   { value: "charge_certificate", label: "Charge certificate" },
-  { value: "notice_of_intended_prosecution", label: "Notice of intended prosecution" },
+  { value: "notice_of_intended_prosecution", label: "Speeding / camera notice" },
   { value: "parking_charge_notice", label: "Parking charge notice" },
   { value: "letter_before_action", label: "Letter before action" },
   { value: "county_court_claim", label: "County court claim" },
@@ -46,7 +46,7 @@ const REASONS: { key: "signage_obscured" | "was_loading" | "emergency_pickup"; l
   { key: "emergency_pickup", label: "It was an emergency" },
 ];
 
-type Step = "details" | "reasons" | "health" | "letter";
+type Step = "details" | "reasons" | "health" | "letter" | "police";
 
 export default function AppealPage() {
   const [step, setStep] = useState<Step>("details");
@@ -322,7 +322,7 @@ export default function AppealPage() {
         </div>
 
         <div className="card flex flex-col gap-1">
-          <DetailRow label={issuer.nameLabel} required value={issuerName} onChange={setIssuerName} placeholder="For example, Lambeth" />
+          <DetailRow label={issuer.nameLabel} required value={issuerName} onChange={setIssuerName} placeholder={issuerType === "local_council" ? "For example, Lambeth" : issuerType === "private_parking_operator" ? "For example, UK Car Park Management" : "Who sent the letter"} />
           <DetailRow label="Reference" required value={referenceNumber} onChange={setReferenceNumber} placeholder="LB44170921" />
           {issuer.hasCode && (
             <DetailRow label="Code" value={contraventionCode} onChange={setContraventionCode} placeholder="01" />
@@ -358,10 +358,30 @@ export default function AppealPage() {
         )}
 
         <div className="mt-auto">
-          <button type="button" className="btn" disabled={!issuerName.trim() || !referenceNumber.trim()} onClick={() => setStep("reasons")}>
+          <button type="button" className="btn" disabled={!issuerName.trim() || !referenceNumber.trim()} onClick={() => setStep(issuerType === "police" ? "police" : "reasons")}>
             Continue
           </button>
         </div>
+      </div>
+    );
+  }
+
+  if (step === "police") {
+    // A Notice of Intended Prosecution is a criminal matter with a legal duty
+    // to name the driver: we never draft a letter for it.
+    return (
+      <div className="wrap">
+        <TopBar onBack={() => setStep("details")} />
+        <h1 className="h2">What to do with a speeding or camera notice</h1>
+        <LetterGuide kind="police_nip" respondBy={null} fees={null} originalCreditor={null} />
+        <p className="text-[14px] leading-[1.5] text-muted">
+          We do not write letters for police notices, because the law requires a specific response: you must name the driver
+          within 28 days using the form or website on the notice. If you want to dispute the offence itself, please get free
+          legal advice first.
+        </p>
+        <Link href="/sfs" className="btn-ghost">
+          Plan my repayments instead
+        </Link>
       </div>
     );
   }
@@ -524,9 +544,14 @@ export default function AppealPage() {
           {savedId ? (
             <p className="text-[13px] font-semibold text-safe text-center">Saved to your letters ✓</p>
           ) : !user ? (
-            <button type="button" className="btn-ghost" onClick={() => login()}>
-              Log in to save this letter
-            </button>
+            <>
+              <p className="text-[13px] text-rust text-center">
+                This letter is not saved yet. Copy it or log in, or it will be lost when you leave this page.
+              </p>
+              <button type="button" className="btn-ghost" onClick={() => login()}>
+                Log in to save this letter
+              </button>
+            </>
           ) : null}
           <Link href="/sfs" className="btn-ghost">
             Next: sort out what I owe →

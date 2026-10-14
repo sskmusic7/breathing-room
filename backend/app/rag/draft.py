@@ -74,8 +74,8 @@ the outcome in writing.
 Yours faithfully,
 [Your name]"""
 
-HANDOFF_STAGES = {"county_court_claim"}
-HANDOFF_ISSUERS = {"enforcement_agent", "court"}
+HANDOFF_STAGES = {"county_court_claim", "notice_of_intended_prosecution"}
+HANDOFF_ISSUERS = {"enforcement_agent", "court", "police"}
 
 
 def _grounds(facts: NoticeFacts) -> list[str]:
