@@ -113,3 +113,20 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .flow-dot { animation: none; }
 }
+
+/* Proof page progress bar: a coin pulsing at the leading edge. */
+@keyframes coin {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.35); }
+}
+.progress-coin {
+  position: absolute;
+  top: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  background: #ffd45c;
+  box-shadow: 0 0 0 2px #fff;
+  animation: coin 0.9s ease-in-out infinite;
+  transition: left 0.7s;
+}

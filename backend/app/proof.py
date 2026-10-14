@@ -115,6 +115,9 @@ def get_proof() -> dict:
         ledger = list(reversed(_ledger))[:30]
     balance_wei = int(_rpc("eth_getBalance", [DEMO_POT, "latest"]), 16)
     return {
+        "creditors": [
+            {"label": c["label"], "reference": c.get("reference")} for c in (record.get("plan") or {}).get("creditors", [])
+        ],
         "addresses": {"pot": DEMO_POT, "automation": DEMO_AUTOMATION, "receiver": RECEIVER, "forwarder": FORWARDER},
         "explorer": "https://testnet.monadscan.com",
         "pot_balance_gbp": round(balance_wei / 1e18 / onramp.GBP_TO_MON_RATE, 2),
@@ -126,8 +129,15 @@ def get_proof() -> dict:
 
 
 @router.post("/run")
-def run_demo() -> dict:
+def run_demo(body: dict | None = None) -> dict:
+    """Send a test payday of the visitor's chosen size (GBP10 to GBP500)."""
     global _last_run
+    try:
+        amount = round(float((body or {}).get("amount_gbp", DEMO_PAYDAY_GBP)), 2)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="Please enter an amount in pounds.")
+    if not 10 <= amount <= 500:
+        raise HTTPException(status_code=422, detail="Please choose an amount between £10 and £500.")
     with _lock:
         if time.time() - _last_run < RUN_COOLDOWN:
             raise HTTPException(status_code=429, detail="A demo payday is already on its way. Watch it land, then try again in a couple of minutes.")
@@ -135,9 +145,9 @@ def run_demo() -> dict:
     if int(_rpc("eth_getBalance", [DEMO_POT, "latest"]), 16) > 0:
         raise HTTPException(status_code=409, detail="The last payday is still being paid out. Give it a minute.")
     try:
-        tx = onramp.send_to_pot(DEMO_POT, DEMO_PAYDAY_GBP)
+        tx = onramp.send_to_pot(DEMO_POT, amount)
     except Exception:
         _last_run = 0.0
         raise HTTPException(status_code=502, detail="Couldn't send the test payday just now. Please try again.")
-    store.add_event(DEMO_POT, f"Demo payday of £{DEMO_PAYDAY_GBP:.2f} sent into the pot.")
-    return {"tx": tx, "amount_gbp": DEMO_PAYDAY_GBP}
+    store.add_event(DEMO_POT, f"Demo payday of £{amount:.2f} sent into the pot.")
+    return {"tx": tx, "amount_gbp": amount}

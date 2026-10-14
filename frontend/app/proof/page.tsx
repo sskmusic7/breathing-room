@@ -1,7 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPublicClient, http } from "viem";
+import { monadTestnet } from "viem/chains";
 import { DemoTag, TopBar, gbp } from "../components/ui";
+import { DEBT_POTS_ABI, GBP_TO_MON_RATE } from "../lib/contracts";
+
+// Reads go straight from this browser to Monad, not through our server.
+const chain = createPublicClient({ chain: monadTestnet, transport: http() });
+const weiToGbp = (wei: bigint) => Number(wei) / 1e18 / GBP_TO_MON_RATE;
+
+interface OnChainCreditor {
+  label: string;
+  bps: number;
+  priorityGbp: number;
+  isPriority: boolean;
+}
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const REPO = "https://github.com/sskmusic7/breathing-room";
@@ -26,6 +40,11 @@ export default function ProofPage() {
   const [runStart, setRunStart] = useState<number | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+  const [amount, setAmount] = useState("");
+  const [block, setBlock] = useState<bigint | null>(null);
+  const [potGbp, setPotGbp] = useState<number | null>(null);
+  const [rules, setRules] = useState<OnChainCreditor[]>([]);
+  const [verified, setVerified] = useState<Record<string, bigint>>({});
 
   const refresh = useCallback(async () => {
     try {
@@ -40,11 +59,86 @@ export default function ProofPage() {
     return () => clearInterval(id);
   }, [refresh]);
 
+  // Live chain state: block height, the pot's balance and its payout rules,
+  // all read directly from the contract.
+  const pot = proof?.addresses.pot as `0x${string}` | undefined;
+  useEffect(() => {
+    if (!pot) return;
+    let stop = false;
+    const tick = async () => {
+      try {
+        const [b, bal] = await Promise.all([chain.getBlockNumber(), chain.getBalance({ address: pot })]);
+        if (!stop) {
+          setBlock(b);
+          setPotGbp(weiToGbp(bal));
+        }
+      } catch {}
+    };
+    tick();
+    const id = setInterval(tick, 2000);
+    (async () => {
+      try {
+        const n = Number(await chain.readContract({ address: pot, abi: DEBT_POTS_ABI, functionName: "creditorCount" }));
+        const list = await Promise.all(
+          Array.from({ length: n }, (_, i) =>
+            chain.readContract({ address: pot, abi: DEBT_POTS_ABI, functionName: "getCreditor", args: [BigInt(i)] })
+          )
+        );
+        if (!stop)
+          setRules(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            list.map((c: any) => ({
+              label: c.label,
+              bps: Number(c.proRataShareBps),
+              priorityGbp: weiToGbp(c.priorityFixedAmountWei),
+              isPriority: c.isPriority,
+            }))
+          );
+      } catch {}
+    })();
+    return () => {
+      stop = true;
+      clearInterval(id);
+    };
+  }, [pot]);
+
+  // Every transaction on the page is checked against Monad from this browser.
+  useEffect(() => {
+    if (!proof) return;
+    const hashes = new Set<string>([...proof.ledger.map((e) => e.tx), ...proof.runs.flatMap((r) => (r.tx ? [r.tx] : []))]);
+    hashes.forEach(async (h) => {
+      if (verified[h]) return;
+      try {
+        const r = await chain.getTransactionReceipt({ hash: h as `0x${string}` });
+        if (r.status === "success") setVerified((v) => ({ ...v, [h]: r.blockNumber }));
+      } catch {}
+    });
+  }, [proof, verified]);
+
+  // What the contract's own rules will pay for the amount entered.
+  const preview = useMemo(() => {
+    const total = Number(amount);
+    if (!(total > 0) || rules.length === 0) return [];
+    let left = total;
+    const out: { label: string; gbp: number; isPriority: boolean }[] = [];
+    for (const c of rules.filter((r) => r.isPriority)) {
+      const pay = Math.min(c.priorityGbp, left);
+      out.push({ label: c.label, gbp: pay, isPriority: true });
+      left -= pay;
+    }
+    for (const c of rules.filter((r) => !r.isPriority && r.bps > 0)) out.push({ label: c.label, gbp: (left * c.bps) / 10000, isPriority: false });
+    return out;
+  }, [amount, rules]);
+
   async function runIt() {
     setStarting(true);
     setRunError(null);
     try {
-      const res = await fetch(`${API_URL}/proof/run`, { method: "POST" });
+      const res = await fetch(`${API_URL}/proof/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount_gbp: Number(amount) }),
+      });
       const body = await res.json();
       if (!res.ok) throw new Error(body.detail ?? "Couldn't start a run just now.");
       setRunStart(Date.now() / 1000 - 5);
@@ -82,10 +176,67 @@ export default function ProofPage() {
         payday and watch each step happen, then check every one on the public Monad ledger.
       </p>
 
-      <button type="button" className="btn" onClick={runIt} disabled={starting || !proof}>
-        {starting ? "Sending a payday…" : "Run it now: send a £135 test payday"}
+      <section className="card flex flex-col gap-3">
+        <div className="flex items-center justify-between text-[12px] text-muted">
+          <span className="flex items-center gap-1.5 font-semibold text-safe">
+            <span className="w-2 h-2 rounded-full bg-safe animate-pulse" /> Live from Monad testnet
+          </span>
+          <span className="font-mono">block {block ? block.toLocaleString("en-GB") : "…"}</span>
+        </div>
+        <div className="row">
+          <span>In the pot right now</span>
+          <span>{potGbp === null ? "…" : gbp(potGbp, 2)}</span>
+        </div>
+        {rules.length > 0 && (
+          <div className="flex flex-col gap-1">
+            <span className="text-[12px] font-semibold text-muted">Payout rules, read from the contract</span>
+            {rules
+              .filter((r) => r.isPriority || r.bps > 0)
+              .map((r) => (
+                <div key={r.label} className="row text-[13px]">
+                  <span>{r.label}</span>
+                  <span>{r.isPriority ? `first ${gbp(r.priorityGbp, 2)} (priority)` : `${(r.bps / 100).toFixed(2)}% of the rest`}</span>
+                </div>
+              ))}
+          </div>
+        )}
+      </section>
+
+      <label className="field">
+        Test payday amount (£10 to £500)
+        <input
+          type="number"
+          inputMode="decimal"
+          min={10}
+          max={500}
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder="For example, 200"
+          className="input"
+        />
+      </label>
+      {preview.length > 0 && (
+        <div className="card flex flex-col gap-1 text-[13px]">
+          <span className="text-[12px] font-semibold text-muted">The contract will pay</span>
+          {preview.map((p) => (
+            <div key={p.label} className="row">
+              <span>{p.label}</span>
+              <span>{gbp(p.gbp, 2)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      <button
+        type="button"
+        className="btn"
+        onClick={runIt}
+        disabled={starting || !proof || !(Number(amount) >= 10 && Number(amount) <= 500)}
+      >
+        {starting ? "Sending the payday…" : amount ? `Send a ${gbp(Number(amount) || 0, 2)} test payday` : "Enter an amount to send"}
       </button>
       {runError && <p className="error -mt-2">{runError}</p>}
+
+      <ProgressBar value={done.filter(Boolean).length} active={!!runStart && done.includes(false)} />
 
       <ol className="relative flex flex-col gap-0">
         <Stage
@@ -93,7 +244,7 @@ export default function ProofPage() {
           state={state(0)}
           title="Payday lands in the pot"
           detail={payday ? `${gbp(payday.amount_gbp, 2)} arrived` : "Waiting for a payday"}
-          link={payday && { href: tx(payday.tx), text: "Deposit transaction" }}
+          link={payday && { href: tx(payday.tx), text: verified[payday.tx] ? `Deposit verified on-chain, block ${verified[payday.tx].toLocaleString("en-GB")}` : "Deposit transaction" }}
         />
         <Stage
           n={2}
@@ -104,7 +255,14 @@ export default function ProofPage() {
               ? `Triggered at ${new Date(paidRun.at).toLocaleTimeString("en-GB")}`
               : `Checks every 2 minutes${lastCheck ? `, last checked at ${new Date(lastCheck.at).toLocaleTimeString("en-GB")}` : ""}`
           }
-          link={paidRun?.tx ? { href: tx(paidRun.tx), text: "Chainlink report transaction" } : undefined}
+          link={
+            paidRun?.tx
+              ? {
+                  href: tx(paidRun.tx),
+                  text: verified[paidRun.tx] ? `Chainlink report verified on-chain, block ${verified[paidRun.tx].toLocaleString("en-GB")}` : "Chainlink report transaction",
+                }
+              : undefined
+          }
         />
         <Stage
           n={3}
@@ -236,5 +394,20 @@ function Stage({
         {children}
       </div>
     </li>
+  );
+}
+
+function ProgressBar({ value, active }: { value: number; active: boolean }) {
+  const pct = (value / 4) * 100;
+  return (
+    <div className="flex flex-col gap-1" aria-label={`${value} of 4 steps complete`}>
+      <div className="relative h-3 rounded-full bg-line overflow-hidden">
+        <div className="absolute inset-y-0 left-0 bg-safe transition-all duration-700" style={{ width: `${pct}%` }} />
+        {active && <div className="progress-coin" style={{ left: `calc(${pct}% - 6px)` }} />}
+      </div>
+      <span className="text-[12px] text-muted">
+        {value === 4 ? "All four steps complete." : active ? `Step ${value + 1} of 4 in progress…` : `${value} of 4 steps complete.`}
+      </span>
+    </div>
   );
 }
