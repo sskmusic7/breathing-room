@@ -69,6 +69,7 @@ def calculate_sfs(request: SfsRequest) -> SfsResult:
     priority_total = Decimal("0")
     for c in priority:
         offer = c.priority_token_offer if c.priority_token_offer is not None else DEFAULT_TOKEN_OFFER
+        offer = min(offer, c.balance)  # never pay more than is owed
         priority_total += offer
         allocations.append(
             CreditorAllocation(
@@ -88,10 +89,32 @@ def calculate_sfs(request: SfsRequest) -> SfsResult:
     # promises more than the surplus and matches what DebtPots actually pays:
     #   payment_to_X = (surplus - priority) * (balance_X / total_non_priority_debt)
     non_priority_pot = max(allocatable_surplus - priority_total, Decimal("0"))
+
+    # Nobody is paid more than they're owed: a creditor whose share would
+    # exceed their balance gets the balance, and the rest is re-split by
+    # balance among the others.
+    capped: dict[str, Decimal] = {}
+    pot_left, open_ = non_priority_pot, list(non_priority)
+    while open_:
+        weight = sum((c.balance for c in open_), Decimal("0"))
+        over = [c for c in open_ if weight > 0 and pot_left * c.balance / weight >= c.balance]
+        if not over:
+            break
+        for c in over:
+            capped[c.id] = c.balance
+            pot_left -= c.balance
+            open_.remove(c)
+    open_weight = sum((c.balance for c in open_), Decimal("0"))
+
     for c in non_priority:
         if total_non_priority_debt > 0:
             share_pct = _money((c.balance / total_non_priority_debt) * Decimal("100"))
-            strict_share = non_priority_pot * (c.balance / total_non_priority_debt)
+            if c.id in capped:
+                strict_share = capped[c.id]
+            elif open_weight > 0:
+                strict_share = max(pot_left, Decimal("0")) * (c.balance / open_weight)
+            else:
+                strict_share = Decimal("0")
             bps = int((c.balance / total_non_priority_debt * BPS_DENOMINATOR).to_integral_value())
         else:
             share_pct = Decimal("0.00")

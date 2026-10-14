@@ -242,7 +242,12 @@ export default function SweepPage() {
   // Prefill the creditor table from the last budget (this device first, then
   // the saved account), then bring back each creditor's saved bank details.
   const applySfs = useCallback((sfs: SfsResult) => {
-    setSurplusGbp(Number(sfs.surplus_for_creditors) || null);
+    // Collect only what the plan pays out (payments are capped at what's owed),
+    // and give the contract each non-priority creditor's share of that.
+    const offers = sfs.allocations.map((a) => Number(a.pragmatic_offer) || 0);
+    const total = offers.reduce((s, x) => s + x, 0);
+    const npTotal = sfs.allocations.reduce((s, a, i) => s + (a.category === "priority" ? 0 : offers[i]), 0);
+    setSurplusGbp(Math.round(total * 100) / 100 || null);
     setProtectedGbp(Number(sfs.total_outgoings) + Number(sfs.savings_buffer) || null);
     setCreditors(
       sfs.allocations.map((a) => ({
@@ -250,7 +255,7 @@ export default function SweepPage() {
         wallet: "",
         label: a.name,
         debtBalanceGbp: a.balance,
-        proRataShareBps: a.category === "priority" ? 0 : a.pro_rata_share_bps,
+        proRataShareBps: a.category === "priority" || !npTotal ? 0 : Math.round((Number(a.pragmatic_offer) / npTotal) * 10000),
         priorityFixedAmountGbp: a.category === "priority" ? a.pragmatic_offer : "0",
         isPriority: a.category === "priority",
         sortCode: "",

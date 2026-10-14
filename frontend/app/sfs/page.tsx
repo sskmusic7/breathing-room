@@ -72,6 +72,35 @@ export default function SfsPage() {
       .catch(() => {});
   }, [wallet]);
 
+  // Keep the figures on this device too, so going back never empties the form.
+  const LOCAL_INPUTS_KEY = "breathing-room:sfs-inputs";
+  const [localLoaded, setLocalLoaded] = useState(false);
+  useEffect(() => {
+    try {
+      const i = JSON.parse(localStorage.getItem(LOCAL_INPUTS_KEY) || "null");
+      if (i) {
+        setEmploymentIncome(i.employmentIncome ?? "");
+        setBenefitsIncome(i.benefitsIncome ?? "");
+        setOtherIncome(i.otherIncome ?? "");
+        setDeductions(i.deductions ?? "");
+        setFixedCosts(i.fixedCosts ?? "");
+        setFlexibleCosts(i.flexibleCosts ?? "");
+        setSavingsBuffer(i.savingsBuffer ?? "5");
+        if (i.creditors?.length) setCreditors(i.creditors);
+      }
+    } catch {}
+    setLocalLoaded(true);
+  }, []);
+  useEffect(() => {
+    if (!localLoaded) return;
+    try {
+      localStorage.setItem(
+        LOCAL_INPUTS_KEY,
+        JSON.stringify({ employmentIncome, benefitsIncome, otherIncome, deductions, fixedCosts, flexibleCosts, savingsBuffer, creditors })
+      );
+    } catch {}
+  }, [localLoaded, employmentIncome, benefitsIncome, otherIncome, deductions, fixedCosts, flexibleCosts, savingsBuffer, creditors]);
+
   // Bring back this person's saved budget when they log in (any device).
   const [restored, setRestored] = useState(false);
   useEffect(() => {
@@ -247,9 +276,9 @@ export default function SfsPage() {
         <div className="card flex flex-col gap-2">
           <div className="row"><span>Money in</span><span>{gbp(result.total_income)}</span></div>
           <div className="row"><span>Living costs</span><span>− {gbp(result.total_outgoings)}</span></div>
-          <div className="row"><span>Safety buffer</span><span>− {gbp(result.savings_buffer)}</span></div>
+          <div className="row"><span>Savings buffer</span><span>− {gbp(result.savings_buffer)}</span></div>
           <div className="h-px bg-line" />
-          <div className="row"><span>For creditors</span><span className="font-bold">{gbp(result.surplus_for_creditors)} / mo</span></div>
+          <div className="row"><span>For creditors</span><span className="font-bold">{gbp(result.surplus_for_creditors)} a month</span></div>
         </div>
         <div className="flex flex-col gap-1.5">
           <span className="label-caps">Split fairly</span>
@@ -384,13 +413,13 @@ export default function SfsPage() {
           <h1 className="h2">Who do you owe?</h1>
           <section className="card flex flex-col gap-3">
             <p className="text-xs text-muted">
-              Add at least one creditor. Fields marked <span className="text-rust">*</span> are required.
+              For example, &quot;Lambeth PCN&quot; and the amount you still owe. Add at least one creditor. Fields marked <span className="text-rust">*</span> are required.
             </p>
             {creditors.map((c) => (
               <div key={c.id} className="flex flex-col gap-2 border-b border-line pb-3 last:border-0 last:pb-0">
                 <div className="grid grid-cols-5 gap-2">
                   <input
-                    placeholder="Creditor name * (for example, Lambeth PCN)"
+                    placeholder="Creditor name *"
                     value={c.name}
                     onChange={(e) => updateCreditor(c.id, { name: e.target.value })}
                     className="input col-span-3"

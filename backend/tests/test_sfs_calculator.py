@@ -168,3 +168,22 @@ def test_plan_never_promises_more_than_the_surplus():
     assert result.surplus_for_creditors == Decimal("135.00")
     total = sum((a.pragmatic_offer for a in result.allocations), Decimal("0"))
     assert abs(total - Decimal("135.00")) <= Decimal("0.02")
+
+
+def test_no_creditor_is_paid_more_than_they_owe():
+    """GBP195 spare against a GBP170 PCN: the PCN gets GBP170, the rest goes to the other debt."""
+    from app.sfs_engine.models import Income, Outgoings, SfsRequest, Creditor, DebtCategory
+    result = calculate_sfs(
+        SfsRequest(
+            income=Income(employment_income=Decimal("1700")),
+            outgoings=Outgoings(fixed_costs=Decimal("1100"), flexible_costs=Decimal("400")),
+            savings_buffer=Decimal("5"),
+            creditors=[
+                Creditor(id="pcn", name="PCN", category=DebtCategory.NON_PRIORITY, balance=Decimal("170")),
+                Creditor(id="cat", name="Catalogue", category=DebtCategory.NON_PRIORITY, balance=Decimal("20")),
+            ],
+        )
+    )
+    by_id = {a.creditor_id: a for a in result.allocations}
+    assert by_id["pcn"].pragmatic_offer <= Decimal("170")
+    assert by_id["cat"].pragmatic_offer <= Decimal("20")
