@@ -258,7 +258,7 @@ export default function SfsPage() {
               <span>
                 {a.name}{" "}
                 {a.category === "priority" && (
-                  <span className="text-[11px] font-bold bg-butter text-ink px-1.5 py-0.5 rounded-[5px]">priority</span>
+                  <span className="text-[11px] font-bold bg-butter text-ink px-1.5 py-0.5 rounded-[3px]">priority</span>
                 )}
               </span>
               <span>{gbp(a.pragmatic_offer)}</span>

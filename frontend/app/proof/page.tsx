@@ -118,7 +118,7 @@ export default function ProofPage() {
                 <li key={p.tx + p.label} className="row">
                   <span>
                     {p.label}
-                    {p.priority && <span className="ml-1.5 text-[10px] font-bold bg-butter text-ink px-1.5 py-0.5 rounded-[5px]">priority</span>}
+                    {p.priority && <span className="ml-1.5 text-[10px] font-bold bg-butter text-ink px-1.5 py-0.5 rounded-[3px]">priority</span>}
                   </span>
                   <a href={tx(p.tx)} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
                     {gbp(p.amount_gbp, 2)}

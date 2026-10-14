@@ -16,7 +16,7 @@ export default function PrivyProvider({
         // Crypto stays invisible: email login only (no "connect a wallet"),
         // and no wallet confirmation popups on each transaction.
         loginMethods: ["email"],
-        appearance: { theme: "#F7F2E9", accentColor: "#1F2340", landingHeader: "Log in with your email" },
+        appearance: { theme: "#F2F4FB", accentColor: "#2445B5", landingHeader: "Log in with your email" },
         // Create embedded wallets for users who don't have a wallet
         embeddedWallets: {
           showWalletUIs: false,

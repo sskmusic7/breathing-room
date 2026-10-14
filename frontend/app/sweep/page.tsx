@@ -461,7 +461,7 @@ export default function SweepPage() {
                       <div className="row">
                         <span className="font-semibold !text-ink truncate">
                           {c.label}
-                          {c.isPriority && <span className="ml-1.5 text-[11px] font-bold bg-butter text-ink px-1.5 py-0.5 rounded-[5px]">priority</span>}
+                          {c.isPriority && <span className="ml-1.5 text-[11px] font-bold bg-butter text-ink px-1.5 py-0.5 rounded-[3px]">priority</span>}
                         </span>
                         <span>{gbp(c.debtBalanceGbp)} owed</span>
                       </div>
@@ -515,7 +515,7 @@ export default function SweepPage() {
               </p>
             </div>
             <p className="text-sm text-muted">Just so you know what&apos;s coming:</p>
-            <div className="bg-paper rounded-[10px] px-3.5 py-3 flex flex-col gap-1.5">
+            <div className="bg-paper rounded-[6px] px-3.5 py-3 flex flex-col gap-1.5">
               <div className="row"><span>Next payments go out</span><span className="font-bold">Payday</span></div>
               <div className="row"><span>Needed in your pot by then</span><span className="font-bold">{gbp(surplusGbp ?? 0)}</span></div>
               <div className="row">

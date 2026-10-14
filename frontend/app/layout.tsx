@@ -1,12 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Figtree, Young_Serif } from "next/font/google";
+import { Atkinson_Hyperlegible, Bricolage_Grotesque } from "next/font/google";
 import "./globals.css";
 import PrivyProvider from "./components/privy-provider";
 import BottomNav from "./components/BottomNav";
 import { DemoBanner } from "./components/ui";
 
-const figtree = Figtree({ subsets: ["latin"], variable: "--font-figtree" });
-const youngSerif = Young_Serif({ subsets: ["latin"], weight: "400", variable: "--font-young-serif" });
+const atkinson = Atkinson_Hyperlegible({ subsets: ["latin"], weight: ["400", "700"], variable: "--font-atkinson" });
+const bricolage = Bricolage_Grotesque({ subsets: ["latin"], weight: ["600", "800"], variable: "--font-bricolage" });
 
 const APP_NAME = "Breathing Room";
 const APP_DEFAULT_TITLE = "Breathing Room";
@@ -53,7 +53,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#F7F2E9",
+  themeColor: "#2445B5",
 };
 
 export default function RootLayout({
@@ -64,7 +64,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${figtree.variable} ${youngSerif.variable}`}
+        className={`${atkinson.variable} ${bricolage.variable}`}
       >
         <PrivyProvider>
           <DemoBanner />

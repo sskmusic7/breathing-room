@@ -14,8 +14,8 @@ export default function Page() {
   return (
     <div className="wrap">
       <TopBar helpLabel="Talk to us" />
-      <h1 className="h1 text-[36px]">Don&apos;t pay yet.</h1>
-      <p className="lead">Let&apos;s see what we can cancel, reduce, or pause.</p>
+      <h1 className="h1 text-[36px] !pb-2">Don&apos;t pay yet.</h1>
+      <p className="lead bg-action text-white -mx-5 -mt-4 px-5 pb-6">Let&apos;s see what we can cancel, reduce, or pause.</p>
       <LetterIllustration />
 
       <div className="mt-auto flex flex-col gap-2.5">

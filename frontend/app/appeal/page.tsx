@@ -225,7 +225,7 @@ export default function AppealPage() {
           {viewing.reference_number ? `Ref ${viewing.reference_number} · ` : ""}
           Written {new Date(viewing.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
         </p>
-        <div className="bg-white border border-line rounded-[10px] p-4 font-[Georgia,serif] text-[13.5px] leading-[1.6] text-[#222] whitespace-pre-wrap max-h-[58vh] overflow-auto">
+        <div className="bg-white border border-line rounded-[6px] p-4 font-[Georgia,serif] text-[13.5px] leading-[1.6] text-[#222] whitespace-pre-wrap max-h-[58vh] overflow-auto">
           {viewing.letter}
         </div>
         <button type="button" className="btn" onClick={() => navigator.clipboard.writeText(viewing.letter)}>
@@ -480,7 +480,7 @@ export default function AppealPage() {
       ) : (
         <>
           <h1 className="h2">Your letter is ready</h1>
-          <div className="bg-white border border-line rounded-[10px] p-4 font-[Georgia,serif] text-[13.5px] leading-[1.6] text-[#222] whitespace-pre-wrap max-h-[52vh] overflow-auto">
+          <div className="bg-white border border-line rounded-[6px] p-4 font-[Georgia,serif] text-[13.5px] leading-[1.6] text-[#222] whitespace-pre-wrap max-h-[52vh] overflow-auto">
             {result.letter.replace(/\*\*/g, "")}
           </div>
           {result.citations.length > 0 && (
@@ -630,7 +630,7 @@ function OwnWords({ value, onChange }: { value: string; onChange: (v: string) =>
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder="e.g. I have ADHD and missed the sign while sorting the kids out."
-          className="input rounded-[10px] leading-[1.4] placeholder:text-muted/60"
+          className="input rounded-[6px] leading-[1.4] placeholder:text-muted/60"
         />
       </label>
       {supported && (

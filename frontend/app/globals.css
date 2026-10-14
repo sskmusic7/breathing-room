@@ -7,15 +7,26 @@ body {
 }
 
 @layer components {
+  /* Blue header band (5a): the top bar, and a heading straight after it. */
+  .topbar {
+    @apply bg-action text-white -mx-5 -mt-4 px-5 pt-4 pb-4;
+  }
+  .topbar .pill {
+    border-color: rgba(255, 255, 255, 0.55);
+  }
+  .topbar + .h1,
+  .topbar + .h2 {
+    @apply bg-action text-white -mx-5 -mt-4 px-5 pb-6;
+  }
   .wrap {
     @apply max-w-md mx-auto px-5 pt-4 pb-28 flex flex-col gap-4 min-h-screen;
   }
   .h1 {
-    @apply font-serif font-normal text-[34px] leading-[1.15] tracking-[-0.005em];
+    @apply font-serif font-extrabold text-[34px] leading-[1.15] tracking-[-0.02em];
     text-wrap: pretty;
   }
   .h2 {
-    @apply font-serif font-normal text-[26px] leading-[1.15] tracking-[-0.005em];
+    @apply font-serif font-extrabold text-[26px] leading-[1.15] tracking-[-0.02em];
     text-wrap: pretty;
   }
   .lead {
@@ -25,7 +36,7 @@ body {
     @apply bg-card border border-line rounded-2xl px-4 py-3.5;
   }
   .btn {
-    @apply block w-full text-center bg-ink text-white font-semibold text-base py-[15px] px-4 rounded-2xl disabled:opacity-50;
+    @apply block w-full text-center bg-action text-white font-semibold text-base py-[15px] px-4 rounded-2xl disabled:opacity-50;
   }
   .btn-ghost {
     @apply block w-full text-center bg-card text-ink border-[1.5px] border-line font-semibold text-[15px] py-[13px] px-4 rounded-2xl disabled:opacity-50;
@@ -34,13 +45,13 @@ body {
     @apply block text-center text-ink font-semibold text-sm p-2 underline underline-offset-[3px];
   }
   .pill {
-    @apply text-[13px] font-semibold px-[11px] py-1.5 rounded-full border-[1.5px] border-line whitespace-nowrap;
+    @apply text-[13px] font-semibold px-[11px] py-1.5 rounded-[6px] border-[1.5px] border-line whitespace-nowrap;
   }
   .chip {
-    @apply text-sm font-semibold px-3.5 py-2 rounded-full border-[1.5px] border-line bg-card text-ink whitespace-nowrap;
+    @apply text-sm font-semibold px-3.5 py-2 rounded-[6px] border-[1.5px] border-line bg-card text-ink whitespace-nowrap;
   }
   .chip[aria-pressed="true"] {
-    @apply bg-ink text-white border-ink;
+    @apply bg-action text-white border-action;
   }
   .row {
     @apply flex items-center justify-between gap-2 text-[15px];
@@ -55,7 +66,7 @@ body {
     @apply flex flex-col gap-1.5 text-[13px] font-semibold text-muted;
   }
   .input {
-    @apply w-full rounded-[10px] border-[1.5px] border-line bg-card px-3 py-2.5 text-[15px] font-normal text-ink outline-none focus:border-ink;
+    @apply w-full rounded-[4px] border-[1.5px] border-line bg-card px-3 py-2.5 text-[15px] font-normal text-ink outline-none focus:border-action;
   }
   .label-caps {
     @apply text-xs font-bold tracking-[.06em] text-muted uppercase;
