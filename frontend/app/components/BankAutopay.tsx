@@ -117,7 +117,7 @@ export default function BankAutopay({
   const steps: { label: string; done: boolean }[] = [
     { label: "Bank connected", done: status.bank_connected },
     { label: "Collection approved in your bank", done: approved },
-    { label: spottedIn ? `Payday spotted · ${gbp(spottedIn)} in` : "Payday spotted", done: spottedIdx >= 0 },
+    { label: spottedIn ? `Payday spotted: ${gbp(spottedIn)} received` : "Payday spotted", done: spottedIdx >= 0 },
     { label: `Collecting ${gbp(surplus)}`, done: moved },
     { label: "Moved into your pot", done: moved },
     { label: "Creditors paid", done: paid },
@@ -128,7 +128,7 @@ export default function BankAutopay({
   const [kicker, headline] = paused
     ? ["Paused", "Nothing goes out until you resume"]
     : !status.bank_connected || !approved
-      ? ["Nearly there", "Let's make it automatic"]
+      ? ["Almost done", "Set up automatic payments"]
       : paid
         ? ["All done this month", "Your creditors have been paid"]
         : spottedIdx >= 0 && !failed
@@ -172,8 +172,8 @@ export default function BankAutopay({
       {!status.bank_connected ? (
         <div className="card flex flex-col gap-2.5">
           <p className="text-[13px] leading-[1.45] text-muted">
-            Link your bank so we can spot payday. Read-only, through TrueLayer (FCA authorised). We can never move money without
-            your approval.
+            Connect your bank so that we can tell when you have been paid. This is read-only access through TrueLayer, which is
+            authorised by the FCA. We can never move money without your approval.
           </p>
           <a href={bankConnectUrl(wallet)} className="btn">
             Connect my bank
@@ -182,8 +182,8 @@ export default function BankAutopay({
       ) : !approved ? (
         <div className="card flex flex-col gap-2.5">
           <p className="text-[13px] leading-[1.45] text-muted">
-            Now approve automatic payday collection, once, in your bank. We only ever take your surplus
-            {surplusGbp ? ` (up to ${gbp(surplusGbp, 2)} a month)` : ""}. Your essentials stay put.
+            Next, approve automatic collection with your bank. You only need to do this once. We will only ever collect your
+            surplus{surplusGbp ? ` (up to ${gbp(surplusGbp, 2)} a month)` : ""}, so the money for your essentials stays in your account.
           </p>
           {!surplusGbp ? (
             <a href="/sfs" className="btn">
@@ -203,7 +203,7 @@ export default function BankAutopay({
               </label>
               {status.providers.length > 1 && (
                 <div className="field">
-                  How should we collect?
+                  How would you like to pay?
                   <div className="flex flex-wrap gap-1.5">
                     {status.providers.map((p) => (
                       <button
@@ -268,7 +268,7 @@ export default function BankAutopay({
                 <span className="text-muted">
                   {new Date(e.at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
                 </span>{" "}
-                · {e.text}
+                : {e.text}
               </li>
             ))}
           </ul>

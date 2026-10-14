@@ -434,7 +434,7 @@ export default function SweepPage() {
 
           <details className="card" open={creditors.length > 0 && !creditorsSaved}>
             <summary className="cursor-pointer font-semibold flex items-center justify-between">
-              <span>Who gets paid</span>
+              <span>Your creditors</span>
               <span className="text-sm text-muted font-medium">{creditorsSaved ? "Saved ✓" : `${creditors.length} creditor${creditors.length === 1 ? "" : "s"}`}</span>
             </summary>
             <div className="mt-3 flex flex-col gap-3">
@@ -449,12 +449,13 @@ export default function SweepPage() {
               ) : (
                 <>
                   <p className="text-[13px] leading-[1.45] text-muted">
-                    Check this before you confirm: each payday we collect {gbp(surplusGbp ?? 0, 2)}, priority debts are paid first,
-                    and the rest is shared by what you owe. Payments go out a few minutes after your payday lands.
+                    Please check this before you confirm. Each payday we will collect {gbp(surplusGbp ?? 0, 2)}. Priority debts are
+                    paid first, and the remainder is shared in proportion to what you owe. Payments are made a few minutes after your
+                    pay arrives.
                   </p>
                   <p className="text-[13px] leading-[1.45] text-muted">
-                    Find these on each letter under &quot;how to pay&quot;. Every payment goes by bank transfer with your
-                    reference, so they can match it.
+                    You can find each creditor&apos;s bank details on their letter, usually under &quot;How to pay&quot;. Every
+                    payment is sent by bank transfer with your reference, so that the creditor can match it to your account.
                   </p>
                   {creditors.map((c) => (
                     <div key={c.id} className="flex flex-col gap-2 border-t border-line pt-3">
@@ -466,21 +467,21 @@ export default function SweepPage() {
                         <span>{gbp(c.debtBalanceGbp)} owed</span>
                       </div>
                       <div className="row text-[13px] -mt-1">
-                        <span>Gets each payday</span>
+                        <span>Payment each payday</span>
                         <span className="font-bold">{gbp(creditorAmount(c), 2)}</span>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
-                        <input placeholder="Their sort code" value={c.sortCode} inputMode="numeric" onChange={(e) => updateCreditor(c.id, { sortCode: e.target.value })} className="input" />
-                        <input placeholder="Their account no." value={c.accountNo} inputMode="numeric" onChange={(e) => updateCreditor(c.id, { accountNo: e.target.value })} className="input" />
-                        <input placeholder="Your reference (PCN / account no.)" value={c.reference} onChange={(e) => updateCreditor(c.id, { reference: e.target.value })} className="input col-span-2" />
-                        <input placeholder="Their address" value={c.address} onChange={(e) => updateCreditor(c.id, { address: e.target.value })} className="input col-span-2" />
-                        <input placeholder="Town / city" value={c.city} onChange={(e) => updateCreditor(c.id, { city: e.target.value })} className="input" />
+                        <input placeholder="Creditor's sort code" value={c.sortCode} inputMode="numeric" onChange={(e) => updateCreditor(c.id, { sortCode: e.target.value })} className="input" />
+                        <input placeholder="Creditor's account number" value={c.accountNo} inputMode="numeric" onChange={(e) => updateCreditor(c.id, { accountNo: e.target.value })} className="input" />
+                        <input placeholder="Your reference (for example, PCN or account number)" value={c.reference} onChange={(e) => updateCreditor(c.id, { reference: e.target.value })} className="input col-span-2" />
+                        <input placeholder="Creditor's address" value={c.address} onChange={(e) => updateCreditor(c.id, { address: e.target.value })} className="input col-span-2" />
+                        <input placeholder="Town or city" value={c.city} onChange={(e) => updateCreditor(c.id, { city: e.target.value })} className="input" />
                         <input placeholder="Postcode" value={c.postcode} onChange={(e) => updateCreditor(c.id, { postcode: e.target.value })} className="input" />
                       </div>
                     </div>
                   ))}
                   <button onClick={onSetCreditors} disabled={creditorsTx.status === "pending"} className="btn">
-                    {creditorsTx.status === "pending" ? "Saving…" : creditorsSaved ? "Saved ✓ · save again" : "Confirm creditors"}
+                    {creditorsTx.status === "pending" ? "Saving…" : creditorsSaved ? "Saved ✓ (save again)" : "Confirm creditors"}
                   </button>
                   {creditorsTx.status === "error" && <p className="error">{creditorsTx.error}</p>}
                 </>
@@ -624,7 +625,7 @@ function ActionCard({
           rel="noopener noreferrer"
           className="block mt-2 text-xs font-semibold text-safe underline"
         >
-          ✅ Done · view receipt
+          ✅ Done. View the receipt
         </a>
       )}
       {tx.status === "error" && <p className="mt-2 error">{tx.error}</p>}

@@ -26,7 +26,7 @@ export default function Page() {
           Scan a letter
         </Link>
         <Link href="/sfs" className="btn-link">
-          Sort out what I owe
+          Plan my repayments
         </Link>
         <div className="flex items-center justify-center gap-1.5 flex-wrap">
           {["MaPS SFS method", "Open Banking"].map((t) => (
@@ -36,9 +36,9 @@ export default function Page() {
           ))}
         </div>
         <p className="text-center text-xs text-muted">
-          Free to you · creditors fund us ·{" "}
+          Free to use, and funded by creditors.{" "}
           <Link href="/terms" className="underline underline-offset-2">
-            Key Facts
+            Read the Key Facts
           </Link>
         </p>
       </div>

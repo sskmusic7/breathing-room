@@ -58,7 +58,7 @@ export function HelpPill({ label = "Help" }: { label?: string }) {
         <a href="tel:08088084000" className="btn">
           Call National Debtline
           <br />
-          <span className="font-normal text-[13px]">0808 808 4000 · free</span>
+          <span className="font-normal text-[13px]">0808 808 4000 (free)</span>
         </a>
         <a href="https://www.citizensadvice.org.uk/debt-and-money/" target="_blank" rel="noopener noreferrer" className="btn-ghost">
           Citizens Advice
@@ -106,7 +106,7 @@ export function Sheet({
 }
 
 export function DemoTag() {
-  return <span className="demo-tag">DEMO · SANDBOX DATA</span>;
+  return <span className="demo-tag">DEMO: SANDBOX DATA</span>;
 }
 
 export const gbp = (n: number | string, dp = 0) =>
@@ -163,9 +163,9 @@ export function KettleIllustration({ animated = false }: { animated?: boolean })
 export function DemoBanner() {
   return (
     <div className="bg-ink text-white text-[12px] leading-[1.35] text-center px-4 py-1.5">
-      Prototype · demo money only, no real payments ·{" "}
+      Prototype: test money only, and no real payments are made.{" "}
       <Link href="/terms#prototype" className="underline underline-offset-2">
-        don&apos;t enter real details
+        Please do not enter real personal details.
       </Link>
     </div>
   );

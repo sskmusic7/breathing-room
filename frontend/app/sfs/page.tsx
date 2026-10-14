@@ -211,7 +211,7 @@ export default function SfsPage() {
           <a href="tel:08088084000" className="btn-ghost">
             Call National Debtline
             <br />
-            <span className="font-normal text-[13px]">0808 808 4000 · free</span>
+            <span className="font-normal text-[13px]">0808 808 4000 (free)</span>
           </a>
           <a href="https://www.citizensadvice.org.uk/debt-and-money/" target="_blank" rel="noopener noreferrer" className="btn-ghost">
             Citizens Advice
@@ -242,7 +242,7 @@ export default function SfsPage() {
         <div className="safe-card flex flex-col gap-1">
           <span className="text-[13px] font-bold">Protected every month</span>
           <span className="font-serif text-[40px] leading-none">{gbp(protectedGbp)}</span>
-          <span className="text-[13px] font-semibold">rent, bills, food and a {gbp(result.savings_buffer)} buffer</span>
+          <span className="text-[13px] font-semibold">for rent, bills, food and a {gbp(result.savings_buffer)} savings buffer</span>
         </div>
         <div className="card flex flex-col gap-2">
           <div className="row"><span>Money in</span><span>{gbp(result.total_income)}</span></div>
@@ -276,7 +276,7 @@ export default function SfsPage() {
           <ul className="list-disc pl-4 mt-1 flex flex-col gap-1">
             <li>You stay responsible for your debts. A plan doesn&apos;t stop interest or action unless a creditor agrees.</li>
             <li>Creditors may not accept reduced payments, and paying less than agreed may show on your credit file.</li>
-            <li>If your income or costs change, update your numbers and we&apos;ll redo the plan. You can pause any time.</li>
+            <li>If your income or costs change, update your figures and we will recalculate your plan. You can pause at any time.</li>
             <li>Free advice is always available from National Debtline, StepChange and Citizens Advice.</li>
           </ul>
         </details>
@@ -316,7 +316,7 @@ export default function SfsPage() {
           ))}
         </div>
         <span className="text-[13px] font-semibold text-muted">
-          Step {formStep + 1} of {STEPS.length} · {STEPS[formStep]}
+          Step {formStep + 1} of {STEPS.length}: {STEPS[formStep]}
         </span>
       </div>
 
@@ -324,10 +324,10 @@ export default function SfsPage() {
         <>
           <h1 className="h2">What comes in each month?</h1>
           <section className="card flex flex-col gap-2.5">
-            <h2 className="font-semibold text-[15px]">Don&apos;t know your numbers?</h2>
+            <h2 className="font-semibold text-[15px]">Not sure of your figures?</h2>
             <p className="text-[13px] leading-[1.45] text-muted -mt-1">
-              We can fill this in from your last 3 months of bank transactions, averaged per month. Read-only, through TrueLayer
-              (FCA authorised). You can change anything after.
+              We can fill in your monthly averages from the last three months of your bank transactions. This uses read-only access
+              through TrueLayer, which is authorised by the FCA. You can change any figure afterwards.
             </p>
             {!user ? (
               <button type="button" onClick={() => login()} className="btn">
@@ -345,17 +345,18 @@ export default function SfsPage() {
               </button>
             )}
             {autoState === "filled" && (
-              <p className="text-[13px] font-semibold text-safe">Filled from your bank (monthly average). Check the numbers look right.</p>
+              <p className="text-[13px] font-semibold text-safe">We have filled in your monthly averages from your bank. Please check that they look right.</p>
             )}
-            {autoState === "error" && <p className="error">Couldn&apos;t read your bank just now. You can type the numbers instead.</p>}
+            {autoState === "error" && <p className="error">We could not read your bank account just now. Please enter your figures instead.</p>}
           </section>
           <section className="card flex flex-col gap-3">
-            <Field label="Wages" required hint="After tax. Put 0 if you don't work." value={employmentIncome} onChange={setEmploymentIncome} />
-            <Field label="Benefits" hint="e.g. Universal Credit, PIP, Child Benefit" value={benefitsIncome} onChange={setBenefitsIncome} />
-            <Field label="Other income" hint="e.g. maintenance you receive, a pension" value={otherIncome} onChange={setOtherIncome} />
+            <Field label="Wages (monthly, after tax)" required hint="Your take-home pay in a typical month. Enter 0 if you are not working." placeholder="For example, 1,640" value={employmentIncome} onChange={setEmploymentIncome} />
+            <Field label="Benefits (monthly)" hint="For example, Universal Credit, PIP or Child Benefit." placeholder="For example, 350" value={benefitsIncome} onChange={setBenefitsIncome} />
+            <Field label="Other income (monthly)" hint="For example, maintenance payments you receive or a pension." placeholder="For example, 0" value={otherIncome} onChange={setOtherIncome} />
             <Field
-              label="Deductions"
-              hint="Money taken off before you get it, e.g. Universal Credit advance repayments, or a self-employed loss"
+              label="Deductions (monthly)"
+              hint="Money taken from your income before you receive it, such as Universal Credit advance repayments or a self-employed loss."
+              placeholder="For example, 0"
               value={deductions}
               onChange={setDeductions}
             />
@@ -367,11 +368,11 @@ export default function SfsPage() {
         <>
           <h1 className="h2">What has to go out?</h1>
           <section className="card flex flex-col gap-3">
-            <Field label="Rent and bills" required hint="e.g. rent or mortgage, council tax, energy, water, phone" value={fixedCosts} onChange={setFixedCosts} />
-            <Field label="Food and everyday" required hint="e.g. food, travel, school costs, toiletries" value={flexibleCosts} onChange={setFlexibleCosts} />
+            <Field label="Rent and bills (monthly)" required hint="For example, rent or mortgage, council tax, energy, water and phone." placeholder="For example, 1,100" value={fixedCosts} onChange={setFixedCosts} />
+            <Field label="Food and everyday costs (monthly)" required hint="For example, food, travel, school costs and toiletries." placeholder="For example, 400" value={flexibleCosts} onChange={setFlexibleCosts} />
             <label className="field">
-              Safety buffer (£5 to £25)
-              <span className="font-normal text-xs">A little kept back each month for surprises.</span>
+              Savings buffer (between £5 and £25 a month)
+              <span className="font-normal text-xs">A small amount set aside each month for unexpected costs.</span>
               <input type="number" min={5} max={25} value={savingsBuffer} onChange={(e) => setSavingsBuffer(e.target.value)} className="input w-28" />
             </label>
           </section>
@@ -383,19 +384,19 @@ export default function SfsPage() {
           <h1 className="h2">Who do you owe?</h1>
           <section className="card flex flex-col gap-3">
             <p className="text-xs text-muted">
-              Add at least one. <span className="text-rust">*</span> Who and how much are needed.
+              Add at least one creditor. Fields marked <span className="text-rust">*</span> are required.
             </p>
             {creditors.map((c) => (
               <div key={c.id} className="flex flex-col gap-2 border-b border-line pb-3 last:border-0 last:pb-0">
                 <div className="grid grid-cols-5 gap-2">
                   <input
-                    placeholder="Who * (e.g. Lambeth PCN)"
+                    placeholder="Creditor name * (for example, Lambeth PCN)"
                     value={c.name}
                     onChange={(e) => updateCreditor(c.id, { name: e.target.value })}
                     className="input col-span-3"
                   />
                   <input
-                    placeholder="Owed £ *"
+                    placeholder="Amount owed (£) *"
                     type="number"
                     value={c.balance}
                     onChange={(e) => updateCreditor(c.id, { balance: e.target.value })}
@@ -422,7 +423,7 @@ export default function SfsPage() {
                 </div>
                 {c.category === "priority" && (
                   <input
-                    placeholder="Agreed monthly payment £ (if any)"
+                    placeholder="Agreed monthly payment in £ (if you have one)"
                     type="number"
                     value={c.priority_token_offer}
                     onChange={(e) => updateCreditor(c.id, { priority_token_offer: e.target.value })}
@@ -436,7 +437,7 @@ export default function SfsPage() {
               onClick={() => setCreditors((rows) => [...rows, emptyCreditor()])}
               className="self-start text-sm font-semibold underline underline-offset-[3px]"
             >
-              + Add another
+              + Add another creditor
             </button>
           </section>
           {error && <p className="error">{error}</p>}
@@ -450,10 +451,10 @@ export default function SfsPage() {
           </button>
         ) : (
           <button type="submit" form="sfs-form" disabled={loading || !stepReady} className="btn">
-            {loading ? "Working it out…" : "See my plan"}
+            {loading ? "Calculating your plan…" : "See my plan"}
           </button>
         )}
-        {!stepReady && <p className="text-center text-xs text-muted">Fill in the fields marked * to carry on. 0 is fine.</p>}
+        {!stepReady && <p className="text-center text-xs text-muted">Please complete the fields marked *. You can enter 0 where it applies.</p>}
       </div>
     </div>
   );
@@ -465,12 +466,14 @@ function Field({
   onChange,
   required,
   hint,
+  placeholder,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   required?: boolean;
   hint?: string;
+  placeholder?: string;
 }) {
   return (
     <label className="field">
@@ -479,7 +482,7 @@ function Field({
         {required && <span className="text-rust"> *</span>}
       </span>
       {hint && <span className="font-normal text-xs -mt-1">{hint}</span>}
-      <input type="number" inputMode="decimal" required={required} value={value} onChange={(e) => onChange(e.target.value)} className="input" />
+      <input type="number" inputMode="decimal" required={required} placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} className="input" />
     </label>
   );
 }

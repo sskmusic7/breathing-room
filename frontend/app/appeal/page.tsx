@@ -222,7 +222,7 @@ export default function AppealPage() {
         <TopBar onBack={() => setViewing(null)} />
         <h1 className="h2">{viewing.issuer_name || "Your letter"}</h1>
         <p className="text-[13px] text-muted -mt-2">
-          {viewing.reference_number ? `Ref ${viewing.reference_number} · ` : ""}
+          {viewing.reference_number ? `Reference ${viewing.reference_number}. ` : ""}
           Written {new Date(viewing.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
         </p>
         <div className="bg-white border border-line rounded-[6px] p-4 font-[Georgia,serif] text-[13.5px] leading-[1.6] text-[#222] whitespace-pre-wrap max-h-[58vh] overflow-auto">
@@ -251,7 +251,7 @@ export default function AppealPage() {
                   <button type="button" onClick={() => setViewing(l)} className="w-full text-left py-2 border-t border-line flex justify-between gap-2 text-sm">
                     <span className="font-semibold truncate">
                       {l.issuer_name || "Letter"}
-                      {l.reference_number ? <span className="text-muted font-normal"> · {l.reference_number}</span> : null}
+                      {l.reference_number ? <span className="text-muted font-normal">, {l.reference_number}</span> : null}
                     </span>
                     <span className="text-muted flex-none">
                       {new Date(l.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} →
@@ -275,12 +275,12 @@ export default function AppealPage() {
           </span>
           <span className="flex flex-col">
             <span className="font-semibold text-[15px]">
-              {scanState === "reading" ? "Reading your letter…" : scanState === "filled" ? "Scan another letter" : "Take a photo of your letter"}
+              {scanState === "reading" ? "Reading your letter…" : scanState === "filled" ? "Scan another letter" : "Photograph or upload your letter"}
             </span>
             <span className="text-[13px] text-muted">
               {scanState === "reading"
-                ? "Hang tight, we're filling it in for you."
-                : "Tap here and we'll fill in the details for you. Don't worry, your data isn't stored."}
+                ? "Please wait while we fill in the details for you."
+                : "We will fill in the details for you. Your photo is not stored."}
             </span>
           </span>
           <input
@@ -296,10 +296,10 @@ export default function AppealPage() {
           />
         </label>
         {scanState === "filled" && (
-          <p className="text-[13px] font-semibold text-safe -mt-2">Filled from your photo. Check each line is right.</p>
+          <p className="text-[13px] font-semibold text-safe -mt-2">We have filled in the details from your photo. Please check each one.</p>
         )}
         {scanState === "error" && <p className="error -mt-2">{scanError}</p>}
-        <p className="text-[13px] text-muted text-center -my-1">or type the details in yourself</p>
+        <p className="text-[13px] text-muted text-center -my-1">Or enter the details yourself below.</p>
         <div className="flex flex-wrap gap-2">
           {ISSUERS.map((i) => (
             <button key={i.type} type="button" className="chip" aria-pressed={i.type === issuerType} onClick={() => pickIssuer(i.type)}>
@@ -309,7 +309,7 @@ export default function AppealPage() {
         </div>
 
         <div className="card flex flex-col gap-1">
-          <DetailRow label={issuer.nameLabel} required value={issuerName} onChange={setIssuerName} placeholder="e.g. Lambeth" />
+          <DetailRow label={issuer.nameLabel} required value={issuerName} onChange={setIssuerName} placeholder="For example, Lambeth" />
           <DetailRow label="Reference" required value={referenceNumber} onChange={setReferenceNumber} placeholder="LB44170921" />
           {issuer.hasCode && (
             <DetailRow label="Code" value={contraventionCode} onChange={setContraventionCode} placeholder="01" />
@@ -334,7 +334,7 @@ export default function AppealPage() {
         </div>
 
         <button type="button" onClick={() => setShowWhere((v) => !v)} className="self-start text-sm font-semibold underline underline-offset-[3px]">
-          Where&apos;s this on my letter?
+          Where can I find these details?
         </button>
         {showWhere && (
           <p className="text-sm leading-[1.45] text-muted -mt-2">
@@ -367,11 +367,11 @@ export default function AppealPage() {
             rows={4}
             value={mitigating.other_notes ?? ""}
             onChange={(e) => setMitigating((m) => ({ ...m, other_notes: e.target.value || null }))}
-            placeholder="e.g. I stopped for two minutes to drop off my mum, and the sign was behind a tree."
+            placeholder="For example: I stopped for two minutes to drop off my mother, and the sign was hidden behind a tree."
             className="input placeholder:text-muted/60"
           />
         </label>
-        <span className="text-[13px] font-semibold text-muted">Tap any that also apply</span>
+        <span className="text-[13px] font-semibold text-muted">Select any that also apply</span>
         <div className="flex flex-col gap-2">
           {REASONS.map((r) => (
             <button
@@ -407,7 +407,7 @@ export default function AppealPage() {
           onClick={() => setConsent(!consentGiven)}
           className={`flex items-center justify-between gap-2.5 bg-card rounded-2xl px-4 py-3.5 border-[1.5px] ${consentGiven ? "border-ink" : "border-line"}`}
         >
-          <span className="font-semibold text-[15px]">Add this to my letter</span>
+          <span className="font-semibold text-[15px]">Include this in my letter</span>
           <span className={`relative w-[46px] h-7 rounded-full flex-none ${consentGiven ? "bg-ink" : "bg-line"}`}>
             <span className={`absolute top-[3px] w-[22px] h-[22px] rounded-full bg-white transition-all ${consentGiven ? "right-[3px]" : "left-[3px]"}`} />
           </span>
@@ -416,7 +416,7 @@ export default function AppealPage() {
         {consentGiven ? (
           <>
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[15px]">Blue Badge holder?</span>
+              <span className="text-[15px]">Do you hold a Blue Badge?</span>
               <span className="flex gap-1.5">
                 {[true, false].map((v) => (
                   <button
@@ -442,7 +442,7 @@ export default function AppealPage() {
           </>
         ) : (
           <p className="text-[15px] leading-[1.45] text-muted">
-            Things like a disability, a health condition or a family emergency can matter. Leaving this off won&apos;t weaken
+            Circumstances such as a disability, a health condition or a family emergency can be taken into account. Leaving this out will not weaken
             your letter.
           </p>
         )}
@@ -629,7 +629,7 @@ function OwnWords({ value, onChange }: { value: string; onChange: (v: string) =>
           rows={3}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="e.g. I have ADHD and missed the sign while sorting the kids out."
+          placeholder="For example: I have ADHD and missed the sign while looking after my children."
           className="input rounded-[6px] leading-[1.4] placeholder:text-muted/60"
         />
       </label>

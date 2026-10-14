@@ -102,7 +102,7 @@ export default function ProofPage() {
           detail={
             paidRun
               ? `Triggered at ${new Date(paidRun.at).toLocaleTimeString("en-GB")}`
-              : `Checks every 2 minutes${lastCheck ? ` · last check ${new Date(lastCheck.at).toLocaleTimeString("en-GB")}` : ""}`
+              : `Checks every 2 minutes${lastCheck ? `, last checked at ${new Date(lastCheck.at).toLocaleTimeString("en-GB")}` : ""}`
           }
           link={paidRun?.tx ? { href: tx(paidRun.tx), text: "Chainlink report transaction" } : undefined}
         />
