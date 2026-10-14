@@ -179,6 +179,25 @@ payment amount will remain available while you consider this.
 {SIGN_OFF}"""
 
 
+def _letter_brief(facts: NoticeFacts) -> str:
+    """What kind of letter this must be, from who is writing and the stage."""
+    if facts.issuer_type == "creditor" or facts.stage_of_notice == "letter_before_action":
+        return (
+            "LETTER TYPE: this is a reply to a DEBT COLLECTION AGENCY or a letter before action, "
+            "NOT an appeal to a parking operator. Address it to the agency named as the issuer. "
+            "State that the debt is disputed and why; ask them to place the account on hold and "
+            "stop collection activity while it is disputed; ask them to confirm in writing the "
+            "name of the original creditor and provide a copy of the original notice and any "
+            "evidence; note that if their client intends to issue a court claim you expect "
+            "compliance with the Pre-Action Protocol for Debt Claims. Do not ask for a "
+            "'reduced payment', a POPLA/IAS code, or 'representations'; those belong to the "
+            "original operator's appeal stage, which has passed."
+        )
+    if facts.issuer_type == "private_parking_operator":
+        return "LETTER TYPE: an appeal to a private parking operator under its code of practice (BPA or IPC)."
+    return "LETTER TYPE: formal representations against a Penalty Charge Notice issued by a public authority."
+
+
 def _uk_date(value: str | None) -> str | None:
     """2025-12-25 -> 25/12/2025, the format UK letters use."""
     if value and len(value) == 10 and value[4] == "-" and value[7] == "-":
@@ -243,6 +262,8 @@ Mitigating circumstances reported by the user (only mention what's relevant, don
 - Dependant crisis: {mitigating.dependant_crisis}
 - Holds Blue Badge: {mitigating.holds_blue_badge}
 - Other notes: {mitigating.other_notes}
+
+{_letter_brief(facts)}
 
 Draft the formal representation letter now."""
 
