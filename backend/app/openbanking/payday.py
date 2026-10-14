@@ -11,6 +11,8 @@ Collection goes through whichever provider the user approved (collectors.py).
 """
 from __future__ import annotations
 
+import os
+
 import re
 from datetime import datetime
 
@@ -60,7 +62,13 @@ def find_payday(transactions: list[dict], processed: set[str]) -> dict | None:
     return max(credits, key=lambda t: float(t["amount"]))
 
 
-def run_cycle(wallet: str) -> None:
+# One automatic collection per pay cycle, however many salary-sized credits
+# appear: a second collection in the same month is never safe to assume.
+COOLDOWN_DAYS = float(os.environ.get("PAYDAY_COOLDOWN_DAYS", "25"))
+
+
+def run_cycle(wallet: str, manual: bool = False) -> None:
+    """`manual` = the user tapped "Check for payday now": skips the cooldown."""
     record = store.get(wallet)
     if not record.get("tokens") or record.get("mandate_status") != "authorized":
         return
@@ -81,6 +89,12 @@ def run_cycle(wallet: str) -> None:
             store.add_event(wallet, f"Bank collection of £{pending['amount_gbp']:.2f} failed. Nothing was taken.")
         return
 
+    last = record.get("last_collected_at")
+    if last and not manual:
+        age = datetime.now(timezone.utc) - datetime.fromisoformat(last)
+        if age < timedelta(days=COOLDOWN_DAYS):
+            return
+
     tokens = truelayer.refresh_data_tokens(record["tokens"])
     if tokens is not record["tokens"]:
         store.update(wallet, tokens=tokens)
@@ -95,6 +109,7 @@ def run_cycle(wallet: str) -> None:
         wallet,
         processed_paydays=[*processed, payday["transaction_id"]],
         pending_payment={"id": payment_id, "amount_gbp": amount, "payday_id": payday["transaction_id"]},
+        last_collected_at=datetime.now(timezone.utc).isoformat(),
     )
     store.add_event(
         wallet,

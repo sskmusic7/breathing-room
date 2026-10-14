@@ -150,7 +150,7 @@ def check_now(wallet: str) -> dict:
     _require_config()
     wallet = _wallet(wallet)
     try:
-        payday.run_cycle(wallet)
+        payday.run_cycle(wallet, manual=True)
     except (collectors.CollectorError, truelayer.TrueLayerError) as exc:
         store.add_event(wallet, f"Payday check hit a problem: {exc}"[:300])
     return status(wallet)
