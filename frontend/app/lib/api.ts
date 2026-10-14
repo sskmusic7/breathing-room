@@ -126,6 +126,13 @@ export interface ScannedLetter {
   date_of_notice: string | null;
   amount_gbp: number | null;
   creditor_bank: { sort_code?: string; account_no?: string; payee_name?: string } | null;
+  issuer_full_name?: string | null;
+  debt_type?: string | null;
+  letter_kind?: string | null;
+  original_creditor?: string | null;
+  respond_by?: string | null;
+  fees_added_gbp?: number | null;
+  payee_address?: { address?: string; city?: string; postcode?: string } | null;
 }
 
 /** Read a photo of a notice with KIMI vision (backend /scan-letter). */
@@ -298,4 +305,64 @@ export async function waitForJob<T>(jobId: string, maxMinutes = 6): Promise<T> {
     }
   }
   throw new Error("This is taking longer than usual. Please try again.");
+}
+
+// ---- Creditors read from scanned letters ----
+// Scanning a letter once captures who to pay and how (name, amount,
+// reference, bank details, address), so the plan and Autopilot fill
+// themselves instead of asking the user to retype it.
+
+export interface LetterCreditor {
+  name: string;
+  amount: number | null;
+  reference: string;
+  sort_code: string;
+  account_no: string;
+  address: string;
+  city: string;
+  postcode: string;
+}
+
+const LETTER_CREDITORS_KEY = "breathing-room:letter-creditors";
+
+export function readLetterCreditors(): LetterCreditor[] {
+  try {
+    return JSON.parse(localStorage.getItem(LETTER_CREDITORS_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+export function saveLetterCreditor(f: ScannedLetter): void {
+  const name = (f.issuer_name || f.issuer_full_name || "").trim();
+  if (!name) return;
+  const entry: LetterCreditor = {
+    name: /council tax/i.test(f.debt_type || "")
+      ? "Council tax"
+      : /pcn|penalty|parking/i.test(`${f.stage_of_notice} ${f.debt_type}`)
+        ? `${name} PCN`
+        : name,
+    amount: f.amount_gbp ?? null,
+    reference: f.reference_number || "",
+    sort_code: f.creditor_bank?.sort_code || "",
+    account_no: f.creditor_bank?.account_no || "",
+    address: f.payee_address?.address || "",
+    city: f.payee_address?.city || "",
+    postcode: f.payee_address?.postcode || "",
+  };
+  const rest = readLetterCreditors().filter((c) => !(c.reference && c.reference === entry.reference));
+  try {
+    localStorage.setItem(LETTER_CREDITORS_KEY, JSON.stringify([entry, ...rest].slice(0, 20)));
+  } catch {}
+}
+
+/** The scanned-letter creditor that matches a creditor name in the plan, if any. */
+export function findLetterCreditor(label: string): LetterCreditor | undefined {
+  const l = label.toLowerCase().trim();
+  const letters = readLetterCreditors();
+  // Best match first: exact name, then one name containing the other.
+  return (
+    letters.find((c) => c.name.toLowerCase() === l) ??
+    letters.find((c) => c.name.toLowerCase().includes(l) || l.includes(c.name.toLowerCase()))
+  );
 }

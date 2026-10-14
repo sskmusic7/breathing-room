@@ -196,7 +196,7 @@ def draft_representation_letter(facts: NoticeFacts) -> dict:
 
     from openai import OpenAI  # imported lazily so the package is optional at import time
 
-    client = OpenAI(api_key=api_key, base_url=MOONSHOT_BASE_URL, timeout=150, max_retries=0)
+    client = OpenAI(api_key=api_key, base_url=MOONSHOT_BASE_URL, timeout=150, max_retries=4)  # KIMI allows 1 request at a time: retry 429s
 
     context_block = "\n\n".join(
         f"### {d.metadata.get('title')} ({d.metadata.get('citation')})\n{d.text}" for d in context

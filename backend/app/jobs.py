@@ -16,7 +16,8 @@ from typing import Callable
 from fastapi import APIRouter, HTTPException
 
 KEEP_SECONDS = 3600
-_pool = ThreadPoolExecutor(max_workers=6)
+# KIMI allows one request at a time per account, so AI jobs queue rather than collide.
+_pool = ThreadPoolExecutor(max_workers=1)
 _jobs: dict[str, dict] = {}
 _lock = threading.Lock()
 

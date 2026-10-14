@@ -36,7 +36,15 @@ Read it and return JSON only, no other text, with these keys (null if not shown)
 - date_of_contravention: YYYY-MM-DD.
 - date_of_notice: the date printed on the letter, YYYY-MM-DD.
 - amount_gbp: the full amount due as a number.
-- creditor_bank: if the letter says how to pay by bank transfer, an object with sort_code, account_no, payee_name; else null.
+- debt_type: what the debt is, in 1-3 words, e.g. "Council tax", "Parking fine", "Catalogue", "Credit card", "Energy bill".
+- issuer_full_name: the sender's full name as printed, e.g. "London Borough of Lambeth".
+- creditor_bank: if the letter says how to pay by bank transfer, an object with sort_code (format 12-34-56), account_no, payee_name; else null.
+- payee_address: the postal address payments or correspondence should go to, as an object with address (street line), city, postcode; else null.
+- letter_kind: one of ["council_pcn", "tfl_pcn", "private_parking_charge", "police_nip", "debt_collector", "solicitor_letter", "order_for_recovery", "bailiff_notice", "council_tax", "creditor_other"].
+  police_nip = Notice of Intended Prosecution / section 172 request (speeding, red light). debt_collector = a collection agency (e.g. TRACE, Debt Recovery Plus) chasing someone else's charge. solicitor_letter = a law firm "Notice of Acting" or letter before claim. order_for_recovery = Form PE2/PE3 from the Traffic Enforcement Centre. bailiff_notice = Notice of Enforcement from an enforcement agency (e.g. Marston, Equita, Jacobs).
+- original_creditor: who the debt was originally owed to, if the sender is collecting for someone else (e.g. "Parking Control Management UK Limited", "Surrey County Council"); else null.
+- respond_by: the deadline to respond or pay, YYYY-MM-DD, if printed or clearly stated (e.g. "within 14 days" of the letter date); else null.
+- fees_added_gbp: collection/enforcement fees on top of the original debt (e.g. a GBP79 compliance fee); else null.
 - readable: false if this isn't a letter or is too blurry to read."""
 
 
@@ -53,7 +61,7 @@ def scan_letter(image_data_url: str) -> dict:
 
     from openai import OpenAI
 
-    client = OpenAI(api_key=api_key, base_url=MOONSHOT_BASE_URL, timeout=90, max_retries=0)
+    client = OpenAI(api_key=api_key, base_url=MOONSHOT_BASE_URL, timeout=170, max_retries=4)  # KIMI allows 1 request at a time: retry 429s
     response = client.chat.completions.create(
         model=VISION_MODEL,
         max_tokens=4000,

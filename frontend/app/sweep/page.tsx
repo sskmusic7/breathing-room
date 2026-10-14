@@ -9,7 +9,7 @@ import { DEBT_POTS_ABI, DEBT_POTS_ADDRESS, DEMO_CREDITOR_ADDRESS, GBP_TO_MON_RAT
 import { DEBT_POTS_BYTECODE } from "../lib/debtPotsBytecode";
 import BankAutopay from "../components/BankAutopay";
 import { DemoTag, Sheet, TopBar, gbp } from "../components/ui";
-import { getMe, readLocalSfs, saveMeCreditors, type SavedPayee, type SfsResult } from "../lib/api";
+import { findLetterCreditor, getMe, readLocalSfs, saveMeCreditors, type SavedPayee, type SfsResult } from "../lib/api";
 
 const publicClient = createPublicClient({ chain: monadTestnet, transport: http() });
 
@@ -250,7 +250,10 @@ export default function SweepPage() {
     setSurplusGbp(Math.round(total * 100) / 100 || null);
     setProtectedGbp(Number(sfs.total_outgoings) + Number(sfs.savings_buffer) || null);
     setCreditors(
-      sfs.allocations.map((a) => ({
+      sfs.allocations.map((a) => {
+        // Bank details from the creditor's own letter, if it was scanned.
+        const fromLetter = findLetterCreditor(a.name);
+        return {
         id: a.creditor_id,
         wallet: "",
         label: a.name,
@@ -258,13 +261,14 @@ export default function SweepPage() {
         proRataShareBps: a.category === "priority" || !npTotal ? 0 : Math.round((Number(a.pragmatic_offer) / npTotal) * 10000),
         priorityFixedAmountGbp: a.category === "priority" ? a.pragmatic_offer : "0",
         isPriority: a.category === "priority",
-        sortCode: "",
-        accountNo: "",
-        reference: "",
-        address: "",
-        city: "",
-        postcode: "",
-      }))
+        sortCode: fromLetter?.sort_code ?? "",
+        accountNo: fromLetter?.account_no ?? "",
+        reference: fromLetter?.reference ?? "",
+        address: fromLetter?.address ?? "",
+        city: fromLetter?.city ?? "",
+        postcode: fromLetter?.postcode ?? "",
+        };
+      })
     );
   }, []);
 
@@ -289,7 +293,15 @@ export default function SweepPage() {
         rows.map((r) => {
           const p = saved[r.id];
           return p
-            ? { ...r, sortCode: p.sort_code, accountNo: p.account_no, reference: p.reference, address: p.address, city: p.city, postcode: p.postcode }
+            ? {
+                ...r,
+                sortCode: p.sort_code || r.sortCode,
+                accountNo: p.account_no || r.accountNo,
+                reference: p.reference || r.reference,
+                address: p.address || r.address,
+                city: p.city || r.city,
+                postcode: p.postcode || r.postcode,
+              }
             : r;
         })
       );

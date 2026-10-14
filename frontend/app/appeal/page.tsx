@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useLogin, usePrivy } from "@privy-io/react-auth";
 import {
   getMe,
+  saveLetterCreditor,
   saveMeLetter,
   startJob,
   waitForJob,
@@ -16,6 +17,7 @@ import {
   type StageOfNotice,
 } from "../lib/api";
 import { KettleIllustration, Sheet, TopBar } from "../components/ui";
+import LetterGuide from "../components/LetterGuide";
 
 const PENDING_LETTER_KEY = "breathing-room:pending-letter";
 
@@ -60,6 +62,7 @@ export default function AppealPage() {
   const [showWhere, setShowWhere] = useState(false);
   const [scanState, setScanState] = useState<"idle" | "reading" | "filled" | "error">("idle");
   const [scanError, setScanError] = useState<string | null>(null);
+  const [scanned, setScanned] = useState<ScannedLetter | null>(null);
 
   const [consentGiven, setConsentGiven] = useState(false);
   const [mitigating, setMitigating] = useState<MitigatingCircumstances>({});
@@ -127,6 +130,8 @@ export default function AppealPage() {
       if (f.date_of_contravention) setDateOfContravention(f.date_of_contravention);
       if (f.date_of_notice) setDateOfNotice(f.date_of_notice);
       if (f.amount_gbp != null) setAmountGbp(String(f.amount_gbp));
+      saveLetterCreditor(f);
+      setScanned(f);
       setScanState("filled");
     } catch (err) {
       setScanError(err instanceof Error ? err.message : String(err));
@@ -299,6 +304,14 @@ export default function AppealPage() {
           <p className="text-[13px] font-semibold text-safe -mt-2">We have filled in the details from your photo. Please check each one.</p>
         )}
         {scanState === "error" && <p className="error -mt-2">{scanError}</p>}
+        {scanState === "filled" && scanned && (
+          <LetterGuide
+            kind={scanned.letter_kind}
+            respondBy={scanned.respond_by}
+            fees={scanned.fees_added_gbp}
+            originalCreditor={scanned.original_creditor}
+          />
+        )}
         <p className="text-[13px] text-muted text-center -my-1">Or enter the details yourself below.</p>
         <div className="flex flex-wrap gap-2">
           {ISSUERS.map((i) => (

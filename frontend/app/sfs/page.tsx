@@ -10,6 +10,7 @@ import {
   getBankStatus,
   getBankSummary,
   getMe,
+  readLetterCreditors,
   saveMeSfs,
   writeLocalSfs,
   type Creditor,
@@ -411,6 +412,16 @@ export default function SfsPage() {
       {formStep === 2 && (
         <form onSubmit={onSubmit} className="flex flex-col gap-4" id="sfs-form">
           <h1 className="h2">Who do you owe?</h1>
+          <LettersToAdd
+            existing={creditors.map((c) => c.name.toLowerCase())}
+            onAdd={(name, amount) =>
+              setCreditors((rows) => {
+                const blank = rows.findIndex((r) => !r.name.trim() && !r.balance.trim());
+                const row = { ...emptyCreditor(), name, balance: amount };
+                return blank >= 0 ? rows.map((r, i) => (i === blank ? row : r)) : [...rows, row];
+              })
+            }
+          />
           <section className="card flex flex-col gap-3">
             <p className="text-xs text-muted">
               For example, &quot;Lambeth PCN&quot; and the amount you still owe. Add at least one creditor. Fields marked <span className="text-rust">*</span> are required.
@@ -513,5 +524,29 @@ function Field({
       {hint && <span className="font-normal text-xs -mt-1">{hint}</span>}
       <input type="number" inputMode="decimal" required={required} placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} className="input" />
     </label>
+  );
+}
+
+// Creditors from letters the user has scanned: one tap adds them to the plan.
+function LettersToAdd({ existing, onAdd }: { existing: string[]; onAdd: (name: string, amount: string) => void }) {
+  const [letters, setLetters] = useState<{ name: string; amount: number | null }[]>([]);
+  useEffect(() => setLetters(readLetterCreditors()), []);
+  const toAdd = letters.filter((l) => !existing.includes(l.name.toLowerCase()));
+  if (toAdd.length === 0) return null;
+  return (
+    <section className="card flex flex-col gap-2">
+      <h2 className="font-semibold text-[15px]">From the letters you scanned</h2>
+      {toAdd.map((l) => (
+        <button
+          key={l.name}
+          type="button"
+          className="btn-ghost text-left flex justify-between"
+          onClick={() => onAdd(l.name, l.amount != null ? String(l.amount) : "")}
+        >
+          <span>+ {l.name}</span>
+          <span>{l.amount != null ? gbp(l.amount, 2) : ""}</span>
+        </button>
+      ))}
+    </section>
   );
 }
