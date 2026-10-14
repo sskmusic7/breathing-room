@@ -94,7 +94,20 @@ class GoCardless:
             raise CollectorError("Direct Debit mandate not set up yet")
         return mandate
 
+    def _simulate(self, scenario: str, resource_id: str) -> None:
+        """Sandbox only. Never raises: a simulator hiccup must not lose a
+        payment that has already been created."""
+        try:
+            self._post(f"/scenario_simulators/{scenario}/actions/run", {"data": {"links": {"resource": resource_id}}})
+        except CollectorError:
+            pass
+
     def collect(self, mandate_ref: str, amount_gbp: float, reference: str) -> str:
+        mandate_id = self._mandate_id(mandate_ref)
+        if os.environ.get("GOCARDLESS_SIMULATE_PAID") == "1":
+            # A fresh sandbox mandate is "pending_submission" for days; the
+            # payment simulator only accepts active mandates.
+            self._simulate("mandate_activated", mandate_id)
         payment = self._post(
             "/payments",
             {
@@ -102,17 +115,14 @@ class GoCardless:
                     "amount": int(round(amount_gbp * 100)),
                     "currency": "GBP",
                     "description": reference,
-                    "links": {"mandate": self._mandate_id(mandate_ref)},
+                    "links": {"mandate": mandate_id},
                 }
             },
         )["payments"]
         if os.environ.get("GOCARDLESS_SIMULATE_PAID") == "1":
             # Sandbox only: real Bacs takes ~3 working days. Fast-forward it
             # so the demo shows the whole flow in minutes.
-            self._post(
-                "/scenario_simulators/payment_paid_out/actions/run",
-                {"data": {"links": {"resource": payment["id"]}}},
-            )
+            self._simulate("payment_paid_out", payment["id"])
         return payment["id"]
 
     def payment_status(self, payment_id: str) -> str:
