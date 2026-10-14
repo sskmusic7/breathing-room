@@ -281,7 +281,9 @@ export default function SweepPage() {
       if (!token) return;
       const me = await getMe(token).catch(() => null);
       if (!me) return;
-      if (!readLocalSfs() && me.sfs?.result) applySfs(me.sfs.result);
+      // Logged in: the plan saved to the account wins over whatever this
+      // device last had, so a phone and a laptop never fight over the plan.
+      if (me.sfs?.result) applySfs(me.sfs.result);
       const saved = me.creditors ?? {};
       setCreditors((rows) =>
         rows.map((r) => {
