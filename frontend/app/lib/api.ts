@@ -350,9 +350,16 @@ export function saveLetterCreditor(f: ScannedLetter): void {
     city: f.payee_address?.city || "",
     postcode: f.payee_address?.postcode || "",
   };
-  const rest = readLetterCreditors().filter((c) => !(c.reference && c.reference === entry.reference));
+  // Merge with an earlier scan of the same letter, so a later step that knows
+  // less (e.g. writing the letter) never wipes the bank details the scan found.
+  const all = readLetterCreditors();
+  const prev = all.find((c) => c.reference && c.reference === entry.reference);
+  const merged = prev
+    ? { ...prev, ...Object.fromEntries(Object.entries(entry).filter(([, v]) => v !== "" && v !== null)) }
+    : entry;
+  const rest = all.filter((c) => c !== prev);
   try {
-    localStorage.setItem(LETTER_CREDITORS_KEY, JSON.stringify([entry, ...rest].slice(0, 20)));
+    localStorage.setItem(LETTER_CREDITORS_KEY, JSON.stringify([merged as LetterCreditor, ...rest].slice(0, 20)));
   } catch {}
 }
 
